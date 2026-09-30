@@ -1,10 +1,11 @@
-"""News bot: fetch -> score with Claude -> Telegram + webpage. Run at each scheduled time.
+"""News bot: fetch -> score with Claude -> webpage. Run at each scheduled time.
 
-    python run.py              # full run: sends to Telegram and remembers what was sent
-    python run.py --no-send    # preview: builds the page and prints the Telegram text only
-    python run.py --fake-scores --no-send   # layout test without calling Claude
+    python run.py              # full run: builds the page and remembers what was shown
+    python run.py --preview    # builds the page only; the next real run still sees the same news
+    python run.py --fake-scores --preview   # layout test without calling Claude
 """
 import argparse
+import shutil
 import json
 import logging
 import os
@@ -19,13 +20,13 @@ warnings.filterwarnings("ignore", message=".*OpenSSL.*")  # harmless urllib3 not
 import yaml
 
 import fetch
-import telegram
 import web
 from score import Story, score_all
 
 ROOT = Path(__file__).parent
 STATE_FILE = ROOT / "state" / "state.json"
 SITE_DIR = ROOT / "site"
+ARCHIVE_DIR = ROOT / "state" / "archive"   # past briefings, carried between runs with the state
 KEEP_SENT_DAYS = 7
 MAX_LOOKBACK = timedelta(hours=36)
 
@@ -49,7 +50,7 @@ def load_state() -> dict:
 
 
 def save_state(state: dict, stories: List[Story], checked: List[str], now: datetime):
-    """`sent`: items delivered (their headlines feed dedupe). `seen`: every item already scored."""
+    """`sent`: items shown on the page (their headlines feed dedupe). `seen`: every item already scored."""
     cutoff = (now - timedelta(days=KEEP_SENT_DAYS)).isoformat()
     sent = {k: v for k, v in state["sent"].items() if v["at"] >= cutoff}
     seen = {k: v for k, v in state.get("seen", {}).items() if v >= cutoff}
@@ -129,9 +130,30 @@ def arrange(stories: List[Story], interests: dict):
     return alerts, digest
 
 
+def write_site(title: str, slug: str, now: datetime, alerts, digest, interests: dict):
+    """Write this briefing to the archive, prune old ones, and rebuild site/ from them."""
+    ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
+    (ARCHIVE_DIR / f"{slug}.html").write_text(web.render(title, now, alerts, digest, interests, home="../"))
+    cutoff = (now - timedelta(days=KEEP_SENT_DAYS)).strftime("%Y-%m-%d")
+    for old in ARCHIVE_DIR.glob("*.html"):
+        if old.stem < cutoff:
+            old.unlink()
+
+    earlier = []
+    for f in sorted(ARCHIVE_DIR.glob("*.html"), reverse=True):
+        if f.stem != slug:
+            day, part = f.stem.rsplit("-", 1)
+            earlier.append((f"{datetime.strptime(day, '%Y-%m-%d'):%a %d %b} · {part}", f"archive/{f.name}"))
+
+    shutil.rmtree(SITE_DIR, ignore_errors=True)
+    shutil.copytree(ARCHIVE_DIR, SITE_DIR / "archive")
+    (SITE_DIR / "index.html").write_text(web.render(title, now, alerts, digest, interests, earlier=earlier))
+    log.info("webpage written to %s (%d earlier briefings)", SITE_DIR / "index.html", len(earlier))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--no-send", action="store_true", help="don't send to Telegram or update state")
+    parser.add_argument("--preview", action="store_true", help="build the page without updating the bot's memory")
     parser.add_argument("--fake-scores", action="store_true", help="skip Claude (layout testing only)")
     args = parser.parse_args()
 
@@ -141,45 +163,40 @@ def main():
     feeds = yaml.safe_load((ROOT / "feeds.yaml").read_text())
     state = load_state()
     now = datetime.now(timezone.utc)
+    local = now.astimezone(ZoneInfo(interests["owner"]["timezone"]))
 
     since = datetime.fromisoformat(state["last_run"]) if state["last_run"] else now - timedelta(hours=24)
     since = max(since, now - MAX_LOOKBACK)
-    log.info("collecting news since %s", since.astimezone(ZoneInfo(interests["owner"]["timezone"])).strftime("%a %H:%M"))
+    log.info("collecting news since %s", since.astimezone(local.tzinfo).strftime("%a %H:%M"))
 
     items_by_topic = fetch.fetch_all(interests, feeds, since)
     done = state["sent"].keys() | state.get("seen", {}).keys()
     for topic in items_by_topic:
         items_by_topic[topic] = [i for i in items_by_topic[topic] if i.id not in done]
-    checked = list({i.id for items in items_by_topic.values() for i in items})
 
     recent = list(dict.fromkeys(v["headline"] for v in state["sent"].values()))[-150:]
-    stories = fake_scores(items_by_topic) if args.fake_scores else score_all(interests, items_by_topic, recent)
+    if args.fake_scores:
+        stories, failed = fake_scores(items_by_topic), []
+    else:
+        stories, failed = score_all(interests, items_by_topic, recent)
+    attempted = [t for t, items in items_by_topic.items() if items]
+    if attempted and len(failed) == len(attempted):
+        raise SystemExit("Claude could not score any topic (see errors above); page and memory left unchanged")
+    if failed:
+        log.warning("topics not scored this run, will retry next run: %s", ", ".join(failed))
+    # Items from failed topics stay unmarked so the next run scores them again.
+    checked = list({i.id for t, items in items_by_topic.items() if t not in failed for i in items})
+
     stories += stock_stories(interests, state["sent"])
     alerts, digest = arrange(stories, interests)
+    shown = alerts + [s for ss in digest.values() for s in ss]
+    log.info("%d alerts, %d digest stories", len(alerts), len(shown) - len(alerts))
 
-    local = now.astimezone(ZoneInfo(interests["owner"]["timezone"]))
-    title = f"{'Morning' if local.hour < 12 else 'Evening'} briefing · {local:%a %d %b}"
-
-    SITE_DIR.mkdir(exist_ok=True)
-    page = web.render(title, now, alerts, digest, interests)
-    (SITE_DIR / "index.html").write_text(page)
-    log.info("webpage written to %s", SITE_DIR / "index.html")
-
-    messages = telegram.format_briefing(title, alerts, digest, os.environ.get("NEWSBOT_PAGE_URL"))
-    delivered = alerts + [s for ss in digest.values() for s in ss]
-    log.info("%d alerts, %d digest stories, %d Telegram message(s)",
-             len(alerts), len(delivered) - len(alerts), len(messages))
-
-    if args.no_send:
-        print("\n" + "\n\n---\n\n".join(messages))
-        return
-    token, chat = os.environ.get("TELEGRAM_BOT_TOKEN"), os.environ.get("TELEGRAM_CHAT_ID")
-    if not token or not chat:
-        raise SystemExit("TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID not set (see .env.example)")
-    if telegram.send(token, chat, messages):
-        save_state(state, delivered, checked, now)
-    else:
-        raise SystemExit("Telegram delivery failed; state not updated so the next run retries")
+    part = "Morning" if local.hour < 12 else "Evening"
+    write_site(f"{part} briefing · {local:%a %d %b}", f"{local:%Y-%m-%d}-{part.lower()}",
+               now, alerts, digest, interests)
+    if not args.preview:
+        save_state(state, shown, checked, now)
 
 
 if __name__ == "__main__":

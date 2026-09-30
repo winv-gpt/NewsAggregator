@@ -1,11 +1,25 @@
 """Render the briefing as a static, phone-friendly webpage."""
 import html
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from zoneinfo import ZoneInfo
 
 from score import Story
-from telegram import label
+
+TOPIC_LABELS = {
+    "chelsea_fc": "⚽ Chelsea",
+    "premier_league": "🏟 Premier League",
+    "big_tech": "💻 Big Tech",
+    "global_payments": "💳 Payments",
+    "thailand_headlines": "🇹🇭 Thailand",
+    "thai_politics": "🏛 Thai politics",
+    "global_news": "🌍 World",
+    "ironman": "🏊 IRONMAN",
+}
+
+
+def label(topic: str) -> str:
+    return TOPIC_LABELS.get(topic, topic.replace("_", " ").title())
 
 CSS = """
 :root { --bg:#f6f5f2; --card:#fff; --text:#1c1c1e; --muted:#6b6b70; --line:#e4e2dc;
@@ -33,6 +47,9 @@ h2 { font-size:15px; text-transform:uppercase; letter-spacing:.06em; color:var(-
 .meta { color:var(--muted); font-size:12.5px; display:flex; gap:8px; flex-wrap:wrap; }
 .tag { color:var(--alert); font-weight:600; }
 .empty { color:var(--muted); }
+header nav a, footer a { color:var(--accent); text-decoration:none; font-size:14px; }
+footer { margin-top:36px; padding-top:16px; border-top:1px solid var(--line); }
+footer ul { list-style:none; padding:0; margin:8px 0 0; display:flex; flex-direction:column; gap:6px; }
 """
 
 
@@ -56,7 +73,8 @@ def _card(story: Story, tz: ZoneInfo, alert_threshold: int, show: List[str], wit
 
 
 def render(title: str, generated: datetime, alerts: List[Story], digest: Dict[str, List[Story]],
-           interests: dict) -> str:
+           interests: dict, earlier: List[Tuple[str, str]] = (), home: str = "") -> str:
+    """`earlier`: (label, href) links to previous briefings. `home`: link back to the latest one."""
     tz = ZoneInfo(interests["owner"]["timezone"])
     page = interests["presentation"]["webpage"]
     show = page.get("show", ["headline", "summary", "source", "time"])
@@ -81,7 +99,17 @@ def render(title: str, generated: datetime, alerts: List[Story], digest: Dict[st
 <title>{html.escape(title)}</title><style>{CSS}</style></head>
 <body><main>
 <header><h1>{html.escape(title)}</h1>
-<p>Updated {generated.astimezone(tz).strftime("%A %d %B, %H:%M")} ({interests["owner"]["timezone"]})</p></header>
+<p>Updated {generated.astimezone(tz).strftime("%A %d %B, %H:%M")} ({interests["owner"]["timezone"]})</p>
+{f'<nav><a href="{home}">← Latest briefing</a></nav>' if home else ""}</header>
 {"".join(sections)}
+{_earlier(earlier)}
 </main></body></html>
 """
+
+
+def _earlier(links: List[Tuple[str, str]]) -> str:
+    if not links:
+        return ""
+    items = "".join(f'<li><a href="{html.escape(href, quote=True)}">{html.escape(text)}</a></li>'
+                    for text, href in links)
+    return f"<footer><h2>Earlier briefings</h2><ul>{items}</ul></footer>"

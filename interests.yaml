@@ -11,8 +11,8 @@ owner:
 schedule: ["07:00", "17:00"]   # the bot runs twice a day; each run covers news since the previous run
 
 alerts:
-  alert_threshold: 8         # score >= 8 -> sent at the top of the Telegram message as an alert
-  digest_threshold: 5        # score 5-7 -> in the digest below; under 5 is dropped
+  alert_threshold: 8         # score >= 8 -> shown in the Alerts section at the top of the page
+  digest_threshold: 5        # score 5-7 -> shown under its topic; under 5 is dropped
   max_alerts_per_run: 5      # extra alerts beyond this drop down into the digest...
   never_capped: [chelsea_fc] # ...except these topics, whose alerts always go through
 
@@ -102,9 +102,6 @@ ignore:
   - opinion pieces (unless unusually significant)
 
 presentation:
-  telegram:
-    style: short            # headline + 1-line summary + link
-    group_by: topic
   webpage:
     layout: cards           # or: list
     sections_order: [chelsea_fc, premier_league, big_tech, global_payments,

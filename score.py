@@ -5,7 +5,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import anthropic
 import yaml
@@ -77,7 +77,8 @@ def _topic_rules(topic: dict) -> str:
 
 
 def score_topic(client: anthropic.Anthropic, interests: dict, key: str, items: List[Item],
-                recent_headlines: List[str]) -> List[Story]:
+                recent_headlines: List[str]) -> Optional[List[Story]]:
+    """Return the topic's stories, or None if Claude could not score it."""
     if not items:
         return []
     alerts = interests["alerts"]
@@ -104,23 +105,23 @@ def score_topic(client: anthropic.Anthropic, interests: dict, key: str, items: L
         )
     except anthropic.APIStatusError as e:
         log.error("topic %s: Claude API error %s: %s", key, e.status_code, e.message)
-        return []
+        return None
     except anthropic.APIConnectionError as e:
         log.error("topic %s: could not reach Claude API: %s", key, e)
-        return []
+        return None
 
     if response.stop_reason == "refusal":
         log.warning("topic %s: request declined (%s)", key, response.stop_details)
-        return []
+        return None
     if response.stop_reason == "max_tokens":
         log.warning("topic %s: response hit max_tokens, skipping", key)
-        return []
+        return None
     text = next((b.text for b in response.content if b.type == "text"), "")
     try:
         raw = json.loads(text)["stories"]
     except (json.JSONDecodeError, KeyError) as e:
         log.error("topic %s: could not parse response: %s", key, e)
-        return []
+        return None
 
     by_id = {i.id: i for i in items}
     stories = []
@@ -142,10 +143,12 @@ def score_topic(client: anthropic.Anthropic, interests: dict, key: str, items: L
 
 
 def score_all(interests: dict, items_by_topic: Dict[str, List[Item]],
-              recent_headlines: List[str]) -> List[Story]:
+              recent_headlines: List[str]) -> Tuple[List[Story], List[str]]:
+    """Return (stories, keys of topics that failed to score)."""
     client = anthropic.Anthropic()
     keys = [k for k, v in items_by_topic.items() if v]
     with ThreadPoolExecutor(max_workers=4) as pool:
-        results = pool.map(lambda k: score_topic(client, interests, k, items_by_topic[k],
-                                                 recent_headlines), keys)
-    return [s for stories in results for s in stories]
+        results = dict(zip(keys, pool.map(lambda k: score_topic(client, interests, k, items_by_topic[k],
+                                                                recent_headlines), keys)))
+    failed = [k for k, r in results.items() if r is None]
+    return [s for r in results.values() if r for s in r], failed

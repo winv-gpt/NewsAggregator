@@ -34,7 +34,7 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      # The bot's memory (what was already sent) lives in state/, carried between runs.
+      # The bot's memory (what was already shown, plus past briefings) lives in state/, carried between runs.
       - name: Restore state
         uses: actions/cache/restore@v4
         with:
@@ -45,9 +45,6 @@ jobs:
       - name: Run briefing
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          NEWSBOT_PAGE_URL: ${{ vars.NEWSBOT_PAGE_URL }}
           NEWSBOT_MODEL: ${{ vars.NEWSBOT_MODEL }}
         run: python run.py
 

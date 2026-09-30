@@ -1,0 +1,64 @@
+name: Save page feedback
+
+# The page's "Save to bot" button opens a pre-filled issue titled "Newsbot feedback: ...".
+# This saves it into feedback.yaml and closes the issue. Only issues opened by the repo
+# owner are applied; anyone else's are ignored.
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: feedback
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: >-
+      github.event.issue.user.login == github.repository_owner &&
+      startsWith(github.event.issue.title, 'Newsbot feedback')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install pyyaml
+
+      - name: Apply feedback
+        id: apply
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          python apply_feedback.py > result.txt
+          cat result.txt
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add feedback.yaml
+          git diff --cached --quiet && exit 0
+          git commit -m "Feedback from issue #${{ github.event.issue.number }}"
+          git pull --rebase && git push
+
+      - name: Close issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue close "${{ github.event.issue.number }}" --repo "${{ github.repository }}" \
+            --comment "Saved: $(cat result.txt). Applies from the next briefing."
+
+      - name: Report failure on the issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue comment "${{ github.event.issue.number }}" --repo "${{ github.repository }}" \
+            --body "Couldn't save this feedback. See the Actions log for details."

@@ -16,7 +16,7 @@ log = logging.getLogger(__name__)
 
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) newsbot/1.0"
 MAX_PER_SOURCE = 40
-SUMMARY_CHARS = 400
+SUMMARY_CHARS = 800
 
 
 @dataclass

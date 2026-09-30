@@ -27,8 +27,9 @@ For the topic:
    - {digest}-{alert_minus}: meets the topic's `digest_if` rule.
    - below {digest}: everything else, including anything matching `ignore` rules.
    Respect caps in the rules (e.g. "top 5", "max 3 per day") by scoring the rest below {digest}.
-3. Write a neutral English headline and a one-sentence English summary for each story, translating
-   any non-English source. Base them only on the items given; do not add facts.
+3. Write a neutral English headline and a 2-3 sentence English summary for each story, translating
+   any non-English source. The summary should say what happened and why it matters, so the reader
+   rarely needs to open the article. Base it only on the items given; do not add facts.
 
 Global ignore rules: {ignore}
 
@@ -46,7 +47,7 @@ SCHEMA = {
                                  "description": "ids of every input item covering this story, most authoritative first"},
                     "score": {"type": "integer", "description": "0-10"},
                     "headline": {"type": "string"},
-                    "summary": {"type": "string", "description": "one sentence"},
+                    "summary": {"type": "string", "description": "2-3 sentences"},
                 },
                 "required": ["item_ids", "score", "headline", "summary"],
                 "additionalProperties": False,
@@ -77,7 +78,7 @@ def _topic_rules(topic: dict) -> str:
 
 
 def score_topic(client: anthropic.Anthropic, interests: dict, key: str, items: List[Item],
-                recent_headlines: List[str]) -> Optional[List[Story]]:
+                recent_headlines: List[str], not_interested: List[dict]) -> Optional[List[Story]]:
     """Return the topic's stories, or None if Claude could not score it."""
     if not items:
         return []
@@ -93,6 +94,7 @@ def score_topic(client: anthropic.Anthropic, interests: dict, key: str, items: L
             f"Headlines already sent in the last few days (score any repeat of these below "
             f"{alerts['digest_threshold']} unless there is a genuinely new development):\n"
             + ("\n".join(f"- {h}" for h in recent_headlines) or "(none)")
+            + _not_interested_block(key, not_interested, alerts["digest_threshold"])
             + f"\n\nItems:\n{json.dumps(payload, ensure_ascii=False)}")
 
     try:
@@ -142,13 +144,24 @@ def score_topic(client: anthropic.Anthropic, interests: dict, key: str, items: L
     return stories
 
 
-def score_all(interests: dict, items_by_topic: Dict[str, List[Item]],
-              recent_headlines: List[str]) -> Tuple[List[Story], List[str]]:
+def _not_interested_block(key: str, feedback: List[dict], digest_threshold: int) -> str:
+    examples = [f for f in feedback if f.get("topic") == key][-25:]
+    if not examples:
+        return ""
+    lines = "\n".join(f"- {f['headline']} ({f.get('source', '')})" for f in examples)
+    return (f"\n\nThe reader marked these past stories 'not interested'. Score stories of the same kind "
+            f"below {digest_threshold}, unless they meet the instant_alert_if rule:\n{lines}")
+
+
+def score_all(interests: dict, items_by_topic: Dict[str, List[Item]], recent_headlines: List[str],
+              not_interested: List[dict] = ()) -> Tuple[List[Story], List[str]]:
     """Return (stories, keys of topics that failed to score)."""
-    client = anthropic.Anthropic()
+    # Keys not scoped to a workspace must name one; workspace-scoped keys need nothing extra.
+    workspace = os.environ.get("ANTHROPIC_WORKSPACE_ID")
+    client = anthropic.Anthropic(default_headers={"anthropic-workspace-id": workspace} if workspace else None)
     keys = [k for k, v in items_by_topic.items() if v]
     with ThreadPoolExecutor(max_workers=4) as pool:
         results = dict(zip(keys, pool.map(lambda k: score_topic(client, interests, k, items_by_topic[k],
-                                                                recent_headlines), keys)))
+                                                                recent_headlines, list(not_interested)), keys)))
     failed = [k for k, r in results.items() if r is None]
     return [s for r in results.values() if r for s in r], failed

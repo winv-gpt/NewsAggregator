@@ -130,10 +130,19 @@ def arrange(stories: List[Story], interests: dict):
     return alerts, digest
 
 
-def write_site(title: str, slug: str, now: datetime, alerts, digest, interests: dict):
+def load_feedback() -> dict:
+    path = ROOT / "feedback.yaml"
+    data = yaml.safe_load(path.read_text()) if path.exists() else None
+    return {"muted_sources": (data or {}).get("muted_sources") or [],
+            "not_interested": (data or {}).get("not_interested") or []}
+
+
+def write_site(title: str, slug: str, now: datetime, alerts, digest, interests: dict, muted: List[str]):
     """Write this briefing to the archive, prune old ones, and rebuild site/ from them."""
+    repo = os.environ.get("GITHUB_REPOSITORY") or "winv-gpt/NewsAggregator"
     ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
-    (ARCHIVE_DIR / f"{slug}.html").write_text(web.render(title, now, alerts, digest, interests, home="../"))
+    (ARCHIVE_DIR / f"{slug}.html").write_text(
+        web.render(title, now, alerts, digest, interests, home="../", repo=repo))
     cutoff = (now - timedelta(days=KEEP_SENT_DAYS)).strftime("%Y-%m-%d")
     for old in ARCHIVE_DIR.glob("*.html"):
         if old.stem < cutoff:
@@ -147,7 +156,8 @@ def write_site(title: str, slug: str, now: datetime, alerts, digest, interests: 
 
     shutil.rmtree(SITE_DIR, ignore_errors=True)
     shutil.copytree(ARCHIVE_DIR, SITE_DIR / "archive")
-    (SITE_DIR / "index.html").write_text(web.render(title, now, alerts, digest, interests, earlier=earlier))
+    (SITE_DIR / "index.html").write_text(web.render(title, now, alerts, digest, interests, earlier=earlier,
+                                                        repo=repo, muted=muted))
     log.info("webpage written to %s (%d earlier briefings)", SITE_DIR / "index.html", len(earlier))
 
 
@@ -169,16 +179,19 @@ def main():
     since = max(since, now - MAX_LOOKBACK)
     log.info("collecting news since %s", since.astimezone(local.tzinfo).strftime("%a %H:%M"))
 
+    feedback = load_feedback()
+    muted = {m.casefold() for m in feedback["muted_sources"]}
     items_by_topic = fetch.fetch_all(interests, feeds, since)
     done = state["sent"].keys() | state.get("seen", {}).keys()
     for topic in items_by_topic:
-        items_by_topic[topic] = [i for i in items_by_topic[topic] if i.id not in done]
+        items_by_topic[topic] = [i for i in items_by_topic[topic]
+                                 if i.id not in done and i.source.casefold() not in muted]
 
     recent = list(dict.fromkeys(v["headline"] for v in state["sent"].values()))[-150:]
     if args.fake_scores:
         stories, failed = fake_scores(items_by_topic), []
     else:
-        stories, failed = score_all(interests, items_by_topic, recent)
+        stories, failed = score_all(interests, items_by_topic, recent, feedback["not_interested"])
     attempted = [t for t, items in items_by_topic.items() if items]
     if attempted and len(failed) == len(attempted):
         raise SystemExit("Claude could not score any topic (see errors above); page and memory left unchanged")
@@ -194,7 +207,7 @@ def main():
 
     part = "Morning" if local.hour < 12 else "Evening"
     write_site(f"{part} briefing · {local:%a %d %b}", f"{local:%Y-%m-%d}-{part.lower()}",
-               now, alerts, digest, interests)
+               now, alerts, digest, interests, feedback["muted_sources"])
     if not args.preview:
         save_state(state, shown, checked, now)
 

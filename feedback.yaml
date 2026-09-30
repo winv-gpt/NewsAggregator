@@ -1,0 +1,7 @@
+# Your feedback from the page's checkboxes, saved here automatically (via GitHub issues).
+# Safe to edit by hand: delete an entry to unmute a source or forget a "not interested" example.
+# muted_sources: stories from these outlets are dropped before scoring.
+# not_interested: stories you ticked "Not interested"; Claude scores similar ones lower.
+
+muted_sources: []
+not_interested: []

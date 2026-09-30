@@ -1,0 +1,43 @@
+# feeds.yaml — maps each source name used in interests.yaml to where it is fetched from.
+#   url:    an RSS/Atom feed
+#   google: a Google News search (for sites with no feed of their own)
+# To add a source: add an entry here, then use its name in interests.yaml.
+
+# --- Football ---
+chelseafc.com news:     { google: "site:chelseafc.com" }
+BBC Sport Chelsea:      { url: "https://feeds.bbci.co.uk/sport/football/teams/chelsea/rss.xml" }
+Chelsea FC (Google News): { google: '"Chelsea FC"' }
+premierleague.com:      { google: "site:premierleague.com" }
+BBC Sport football:     { url: "https://feeds.bbci.co.uk/sport/football/premier-league/rss.xml" }
+
+# --- Thailand (English) ---
+Bangkok Post:           { url: "https://www.bangkokpost.com/rss/data/topstories.xml" }
+Thai PBS World:         { google: "site:thaipbsworld.com" }
+Khaosod English:        { url: "https://www.khaosodenglish.com/feed/" }
+The Nation Thailand:    { google: "site:nationthailand.com" }
+
+# --- Thailand (Thai language, translated) ---
+Thairath:               { url: "https://www.thairath.co.th/rss/news" }
+Matichon:               { url: "https://www.matichon.co.th/feed" }
+Prachachat:             { url: "https://www.prachachat.net/feed" }
+
+# --- Triathlon ---
+ironman.com news:       { google: "IRONMAN triathlon" }
+Triathlete magazine:    { url: "https://www.triathlete.com/feed/" }
+Slowtwitch:             { url: "https://www.slowtwitch.com/feed/" }
+
+# --- World ---
+BBC News:               { url: "https://feeds.bbci.co.uk/news/world/rss.xml" }
+The New York Times:     { url: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml" }
+
+# --- Tech ---
+The Verge:              { url: "https://www.theverge.com/rss/index.xml" }
+TechCrunch:             { url: "https://techcrunch.com/feed/" }
+Reuters Technology:     { google: "site:reuters.com technology" }
+Bloomberg Technology:   { url: "https://feeds.bloomberg.com/technology/news.rss" }
+
+# --- Payments ---
+Payments Dive:          { url: "https://www.paymentsdive.com/feeds/news/" }
+Finextra:               { url: "https://www.finextra.com/rss/headlines.aspx" }
+The Paypers:            { google: "site:thepaypers.com" }
+PYMNTS:                 { url: "https://www.pymnts.com/feed/" }

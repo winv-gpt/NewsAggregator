@@ -1,0 +1,114 @@
+# interests.yaml — what the news bot should care about
+# Claude scores every item 0-10 using these rules.
+# Edit freely: change thresholds, add sources, move topics between alert levels.
+# Source names must match an entry in feeds.yaml.
+
+owner:
+  name: Win
+  timezone: Asia/Bangkok
+  output_language: en        # translate all non-English items to English
+
+schedule: ["07:00", "17:00"]   # the bot runs twice a day; each run covers news since the previous run
+
+alerts:
+  alert_threshold: 8         # score >= 8 -> sent at the top of the Telegram message as an alert
+  digest_threshold: 5        # score 5-7 -> in the digest below; under 5 is dropped
+  max_alerts_per_run: 5      # extra alerts beyond this drop down into the digest...
+  never_capped: [chelsea_fc] # ...except these topics, whose alerts always go through
+
+topics:
+
+  chelsea_fc:
+    priority: high
+    sources:
+      web: [chelseafc.com news, BBC Sport Chelsea, Chelsea FC (Google News)]
+      # x_accounts: ["@blue_footy"]   # not supported yet: reading X needs the paid X API
+    instant_alert_if: >
+      Confirmed transfers in/out, manager news, serious injuries to key players,
+      final match results, official club announcements.
+    digest_if: Team news, press conference highlights, credible transfer rumours.
+    ignore: Merchandise promos, unverified rumours from low-credibility accounts.
+
+  premier_league:
+    priority: medium
+    sources:
+      web: [premierleague.com, BBC Sport football]
+    instant_alert_if: Major shocks only (e.g., a manager sacked at a top-6 club).
+    digest_if: Weekend results summary, table changes, major transfers, rulings.
+
+  thailand_headlines:
+    priority: medium
+    sources: &thai_sources
+      web_en: [Bangkok Post, Thai PBS World, Khaosod English, The Nation Thailand]
+      web_th: [Thairath, Matichon, Prachachat]   # translated to English
+    rules: >
+      Top national headlines only. Merge the same story across outlets into one
+      item. Always translate Thai-language items into English, with the source named.
+    instant_alert_if: Major national events (disasters, big policy changes, emergencies).
+    digest_if: Top 5 national headlines of the day.
+
+  thai_politics:
+    priority: medium
+    sources: *thai_sources          # same sources as thailand_headlines
+    rules: >
+      Interesting headlines only: government changes, court rulings, elections,
+      major legislation, coalition shifts. Skip routine statements and minor
+      back-and-forth. Summarize neutrally, without taking sides.
+    instant_alert_if: Change of government/PM, major court rulings, dissolution of parliament.
+    digest_if: Other significant developments (max 3 per day).
+
+  ironman:
+    priority: medium
+    sources:
+      web: [ironman.com news, Triathlete magazine, Slowtwitch]
+    digest_if: >
+      Pro race results (especially Kona and Nice world championships), new race
+      announcements in Asia, gear and training news worth knowing.
+    instant_alert_if: World championship results.
+
+  global_news:
+    priority: medium
+    sources:
+      web: [BBC News, The New York Times]
+    rules: Top headlines only. Merge duplicate stories.
+    instant_alert_if: Major breaking world events.
+    digest_if: Top 5 global headlines.
+
+  big_tech:
+    priority: medium
+    sources:
+      web: [The Verge, TechCrunch, Reuters Technology, Bloomberg Technology]
+    watchlist: [AAPL, MSFT, GOOGL, AMZN, META, NVDA, TSLA]   # daily prices from Yahoo Finance
+    stock_alert_pct: 7       # a daily move bigger than this -> alert
+    stock_digest_pct: 3      # a daily move bigger than this -> digest
+    rules: Top headlines only, plus notable stock moves.
+    instant_alert_if: A major acquisition or antitrust ruling.
+    digest_if: Top tech headlines.
+
+  global_payments:
+    priority: medium
+    sources:
+      web: [Payments Dive, Finextra, The Paypers, PYMNTS]
+    rules: Top payments headlines, with special attention to new payment terminals.
+    digest_if: >
+      Major payments industry news, and any new POS/payment terminal launches
+      (e.g., new hardware from Verifone, Ingenico, PAX, Sunmi, Square, Stripe).
+    instant_alert_if: Major industry deals or launches from Visa, Mastercard, Stripe, Adyen.
+
+ignore:
+  - clickbait and listicles
+  - sponsored content
+  - duplicate stories already sent
+  - opinion pieces (unless unusually significant)
+
+presentation:
+  telegram:
+    style: short            # headline + 1-line summary + link
+    group_by: topic
+  webpage:
+    layout: cards           # or: list
+    sections_order: [chelsea_fc, premier_league, big_tech, global_payments,
+                     thailand_headlines, thai_politics, global_news, ironman]
+    items_per_section: 5
+    show: [headline, summary, source, time]
+    theme: auto             # follows your phone's light/dark mode

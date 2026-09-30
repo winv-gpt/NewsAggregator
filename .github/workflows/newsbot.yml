@@ -1,0 +1,66 @@
+name: News briefing
+
+on:
+  schedule:
+    # GitHub runs cron in UTC and often starts a few minutes late, so these fire
+    # just before 07:00 and 17:00 Asia/Bangkok (UTC+7).
+    - cron: "50 23 * * *"
+    - cron: "50 9 * * *"
+  workflow_dispatch:   # adds a "Run workflow" button for manual runs
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: newsbot
+  cancel-in-progress: false
+
+jobs:
+  briefing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      # The bot's memory (what was already sent) lives in state/, carried between runs.
+      - name: Restore state
+        uses: actions/cache/restore@v4
+        with:
+          path: state
+          key: newsbot-state-${{ github.run_id }}
+          restore-keys: newsbot-state-
+
+      - name: Run briefing
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          NEWSBOT_PAGE_URL: ${{ vars.NEWSBOT_PAGE_URL }}
+          NEWSBOT_MODEL: ${{ vars.NEWSBOT_MODEL }}
+        run: python run.py
+
+      - name: Save state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state
+          key: newsbot-state-${{ github.run_id }}
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

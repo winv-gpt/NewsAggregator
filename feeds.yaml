@@ -17,7 +17,7 @@ Khaosod English:        { url: "https://www.khaosodenglish.com/feed/" }
 The Nation Thailand:    { google: "site:nationthailand.com" }
 
 # --- Thailand (Thai language, translated) ---
-Thairath:               { url: "https://www.thairath.co.th/rss/news" }
+Thairath:               { google: "site:thairath.co.th" }   # its RSS blocks GitHub servers
 Matichon:               { url: "https://www.matichon.co.th/feed" }
 Prachachat:             { url: "https://www.prachachat.net/feed" }
 

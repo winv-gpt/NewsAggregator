@@ -1,6 +1,6 @@
 # News Aggregator
 
-A personal news briefing webpage, rebuilt at 07:30 (*Win's Morning Briefing*) and 19:00 (*Win's Evening Digest*), Bangkok time.
+A personal news briefing webpage, rebuilt at 06:30 (*Win's Morning Briefing*) and 18:00 (*Win's Evening Digest*), Bangkok time.
 
 Page: https://winv-gpt.github.io/NewsAggregator/
 

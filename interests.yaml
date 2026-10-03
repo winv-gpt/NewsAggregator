@@ -10,8 +10,8 @@ owner:
 alerts:
   instant_push: 8            # score >= 8 -> Telegram ping right away
   daily_digest: 5            # score 5-7 -> morning briefing / evening digest
-  morning_briefing_time: "07:30"
-  evening_digest_time: "19:00"
+  morning_briefing_time: "06:30"
+  evening_digest_time: "18:00"
   quiet_hours: ["23:00", "06:30"]   # hold pings overnight (except Chelsea match results)
   max_instant_per_day: 6
 

@@ -1,28 +1,27 @@
 # interests.yaml — what the news bot should care about
 # Claude scores every item 0-10 using these rules.
 # Edit freely: change thresholds, add sources, move topics between alert levels.
-# Source names must match an entry in feeds.yaml.
 
 owner:
   name: Win
   timezone: Asia/Bangkok
   output_language: en        # translate all non-English items to English
 
-schedule: ["07:00", "17:00"]   # the bot runs twice a day; each run covers news since the previous run
-
 alerts:
-  alert_threshold: 8         # score >= 8 -> shown in the Alerts section at the top of the page
-  digest_threshold: 5        # score 5-7 -> shown under its topic; under 5 is dropped
-  max_alerts_per_run: 5      # extra alerts beyond this drop down into the digest...
-  never_capped: [chelsea_fc] # ...except these topics, whose alerts always go through
+  instant_push: 8            # score >= 8 -> Telegram ping right away
+  daily_digest: 5            # score 5-7 -> morning briefing / evening digest
+  morning_briefing_time: "07:30"
+  evening_digest_time: "19:00"
+  quiet_hours: ["23:00", "06:30"]   # hold pings overnight (except Chelsea match results)
+  max_instant_per_day: 6
 
 topics:
 
   chelsea_fc:
     priority: high
     sources:
-      web: [chelseafc.com news, BBC Sport Chelsea, Chelsea FC (Google News)]
-      # x_accounts: ["@blue_footy"]   # not supported yet: reading X needs the paid X API
+      x_accounts: ["@blue_footy"]
+      web: [chelseafc.com news]
     instant_alert_if: >
       Confirmed transfers in/out, manager news, serious injuries to key players,
       final match results, official club announcements.
@@ -38,9 +37,9 @@ topics:
 
   thailand_headlines:
     priority: medium
-    sources: &thai_sources
+    sources:
       web_en: [Bangkok Post, Thai PBS World, Khaosod English, The Nation Thailand]
-      web_th: [Thairath, Matichon, Prachachat]   # translated to English
+      web_th: [Thairath, Matichon, Prachachat]   # translate to English
     rules: >
       Top national headlines only. Merge the same story across outlets into one
       item. Always translate Thai-language items into English, with the source named.
@@ -49,7 +48,7 @@ topics:
 
   thai_politics:
     priority: medium
-    sources: *thai_sources          # same sources as thailand_headlines
+    sources: same as thailand_headlines
     rules: >
       Interesting headlines only: government changes, court rulings, elections,
       major legislation, coalition shifts. Skip routine statements and minor
@@ -78,12 +77,11 @@ topics:
     priority: medium
     sources:
       web: [The Verge, TechCrunch, Reuters Technology, Bloomberg Technology]
-    watchlist: [AAPL, MSFT, GOOGL, AMZN, META, NVDA, TSLA]   # daily prices from Yahoo Finance
-    stock_alert_pct: 7       # a daily move bigger than this -> alert
-    stock_digest_pct: 3      # a daily move bigger than this -> digest
+      market_data: [daily prices for watchlist]   # Claude Code will pick a data source
+    watchlist: [AAPL, MSFT, GOOGL, AMZN, META, NVDA, TSLA]
     rules: Top headlines only, plus notable stock moves.
-    instant_alert_if: A major acquisition or antitrust ruling.
-    digest_if: Top tech headlines.
+    instant_alert_if: A watchlist stock moves more than 7% in a day, or a major acquisition/antitrust ruling.
+    digest_if: Top tech headlines; watchlist stocks moving more than 3% in a day.
 
   global_payments:
     priority: medium
@@ -102,10 +100,48 @@ ignore:
   - opinion pieces (unless unusually significant)
 
 presentation:
+  titles:
+    morning: "Win's Morning Briefing"     # used for runs before 12:00
+    evening: "Win's Evening Digest"       # used for runs from 12:00
+  summaries:
+    max_words: 25            # shorter than before: about one sentence
+  telegram:
+    style: short             # headline + 1-line summary + link
+    group_by: topic
+  feedback_buttons:          # shown on every item, in Telegram and on the webpage
+    - {label: "👍", meaning: more like this}
+    - {label: "👎", meaning: less like this}
+    - {label: "⭐", meaning: "I liked this: save it and weight similar stories higher"}
   webpage:
-    layout: cards           # or: list
+    layout: cards            # or: list
+    fetch_now_button: true   # button that triggers a fresh fetch
+    show_previous_briefings: false   # earlier briefings section removed
     sections_order: [chelsea_fc, premier_league, big_tech, global_payments,
-                     thailand_headlines, thai_politics, global_news, ironman]
+                     thailand_headlines, thai_politics, global_news, ironman,
+                     markets]
     items_per_section: 5
     show: [headline, summary, source, time]
-    theme: auto             # follows your phone's light/dark mode
+    theme: auto              # follows your phone's light/dark mode
+
+markets:
+  position: bottom           # last section of the webpage and digest
+  chart_range: 12 months
+  refresh: daily
+  drivers_summary:
+    period: past quarter
+    max_words: 60
+    rules: >
+      Explain the main drivers of the move (rates, earnings, policy, geopolitics),
+      based only on news sources, with links. No predictions or buy/sell advice.
+  instruments:
+    - {name: "S&P 500", symbol: "^GSPC"}
+    - {name: "Nasdaq-100 (tech)", symbol: "^NDX"}
+    - {name: "Gold", symbol: "GC=F"}
+    - {name: "Bitcoin", symbol: "BTC-USD"}
+    - {name: "SET Index (Thailand)", symbol: "^SET.BK"}
+    - {name: "USD/THB", symbol: "THB=X"}
+    - {name: "US 10-year Treasury yield", symbol: "^TNX"}
+    - {name: "Brent crude oil", symbol: "BZ=F"}
+    - name: "Payments stocks"     # shown as one compact row with each stock's % change
+      group: [{name: Visa, symbol: V}, {name: Mastercard, symbol: MA},
+              {name: PayPal, symbol: PYPL}, {name: Adyen, symbol: ADYEN.AS}]

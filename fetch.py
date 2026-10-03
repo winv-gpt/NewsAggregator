@@ -1,4 +1,4 @@
-"""Fetch news items from RSS feeds / Google News, and daily stock moves."""
+"""Fetch news items from RSS feeds / Google News, daily stock moves, and 12-month price history."""
 import hashlib
 import html
 import logging
@@ -6,8 +6,8 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
-from urllib.parse import quote_plus
+from typing import Dict, List, Optional, Tuple
+from urllib.parse import quote, quote_plus
 
 import feedparser
 import requests
@@ -38,7 +38,7 @@ def _clean(text: str) -> str:
 def _feed_url(spec: dict) -> str:
     if "url" in spec:
         return spec["url"]
-    q = quote_plus(f'{spec["google"]} when:1d')
+    q = quote_plus(f'{spec["google"]} when:{spec.get("when", "1d")}')
     return f"https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en"
 
 
@@ -90,19 +90,32 @@ def fetch_source(name: str, spec: dict, since: datetime) -> List[Item]:
     return items
 
 
-def topic_sources(topic: dict) -> List[str]:
-    """Flatten a topic's `sources` block (any nesting of lists) into source names."""
+# Source kinds the bot can't read: X needs the paid X API; market data is fetched separately.
+UNSUPPORTED_SOURCES = {"x_accounts", "market_data"}
+
+
+def topic_sources(topics: Dict[str, dict], key: str) -> List[str]:
+    """Flatten a topic's `sources` block (any nesting of lists) into source names.
+    `sources: same as <other topic>` reuses that topic's sources."""
+    sources = topics[key].get("sources") or {}
+    if isinstance(sources, str):
+        other = sources.removeprefix("same as").strip()
+        if other in topics and other != key and not isinstance(topics[other].get("sources"), str):
+            return topic_sources(topics, other)
+        log.warning("topic %s: can't understand sources %r, skipping", key, sources)
+        return []
     names = []
-    for value in (topic.get("sources") or {}).values():
-        names.extend(value if isinstance(value, list) else [value])
+    for kind, value in sources.items():
+        if kind not in UNSUPPORTED_SOURCES:
+            names.extend(value if isinstance(value, list) else [value])
     return names
 
 
 def fetch_all(interests: dict, feeds: Dict[str, dict], since: datetime) -> Dict[str, List[Item]]:
     """Return {topic_key: [items]}. Each source is fetched once even if shared by topics."""
     wanted = {}
-    for key, topic in interests["topics"].items():
-        for name in topic_sources(topic):
+    for key in interests["topics"]:
+        for name in topic_sources(interests["topics"], key):
             if name not in feeds:
                 log.warning("topic %s: source %r is not in feeds.yaml, skipping", key, name)
                 continue
@@ -128,21 +141,27 @@ class StockMove:
     date: str  # trading day of the latest close, YYYY-MM-DD
 
 
+def fetch_prices(symbol: str, range_: str = "1y") -> List[Tuple[str, float]]:
+    """Daily closes from Yahoo Finance as [(YYYY-MM-DD, close)], oldest first; [] on failure."""
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{quote(symbol)}?range={range_}&interval=1d"
+    try:
+        resp = requests.get(url, headers={"User-Agent": UA}, timeout=15)
+        resp.raise_for_status()
+        result = resp.json()["chart"]["result"][0]
+        return [(datetime.fromtimestamp(t, tz=timezone.utc).strftime("%Y-%m-%d"), c)
+                for t, c in zip(result["timestamp"], result["indicators"]["quote"][0]["close"])
+                if c is not None]
+    except (requests.RequestException, KeyError, IndexError, TypeError, ValueError) as e:
+        log.warning("prices for %s failed: %s", symbol, e)
+        return []
+
+
 def fetch_stock_moves(tickers: List[str]) -> List[StockMove]:
     moves = []
     for ticker in tickers:
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?range=5d&interval=1d"
-        try:
-            resp = requests.get(url, headers={"User-Agent": UA}, timeout=15)
-            resp.raise_for_status()
-            result = resp.json()["chart"]["result"][0]
-            points = [(t, c) for t, c in zip(result["timestamp"], result["indicators"]["quote"][0]["close"])
-                      if c is not None]
-            if len(points) < 2:
-                continue
-            (_, prev), (stamp, close) = points[-2], points[-1]
-            day = datetime.fromtimestamp(stamp, tz=timezone.utc).strftime("%Y-%m-%d")
-            moves.append(StockMove(ticker, close, (close / prev - 1) * 100, day))
-        except (requests.RequestException, KeyError, IndexError, ValueError) as e:
-            log.warning("stock %s failed: %s", ticker, e)
+        points = fetch_prices(ticker, "5d")
+        if len(points) < 2:
+            continue
+        (_, prev), (day, close) = points[-2], points[-1]
+        moves.append(StockMove(ticker, close, (close / prev - 1) * 100, day))
     return moves

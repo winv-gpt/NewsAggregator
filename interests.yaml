@@ -137,7 +137,8 @@ markets:
     - {name: "Nasdaq-100 (tech)", symbol: "^NDX"}
     - {name: "Gold", symbol: "GC=F"}
     - {name: "Bitcoin", symbol: "BTC-USD"}
-    - {name: "SET50 (Thailand)", symbol: "^SET50.BK"}
+    - {name: "SET50 (Thailand)", symbol: "^SET50.BK",
+       fallback: {symbol: "TDEX.BK", name: "ThaiDEX SET50 ETF (TDEX)"}}   # Yahoo has no SET50 history
     - {name: "USD/THB", symbol: "THB=X"}
     - {name: "US 10-year Treasury yield", symbol: "^TNX"}
     - {name: "Brent crude oil", symbol: "BZ=F"}

@@ -13,7 +13,7 @@ For a fresh briefing outside the schedule, open GitHub's *Actions → News brief
 
 ## Markets
 
-The last section shows a 12-month chart for each instrument under `markets:` in `interests.yaml` (prices from Yahoo Finance, with the past quarter shaded), its 1-day / 3-month / 12-month change, and a short note (60 words max) from Claude on what drove the past quarter's move, based only on news headlines and linking to them. A `group:` (like *Payments stocks*) is shown as one compact row of % changes. Market data and notes refresh once a day, so the evening digest reuses the morning's (unless you change the `instruments` list).
+The last section shows a 12-month chart for each instrument under `markets:` in `interests.yaml` (prices from Yahoo Finance, with the past quarter shaded), its 1-day / 3-month / 12-month change, and a short note (60 words max) from Claude on what drove the past quarter's move, based only on news headlines and linking to them. A `group:` (like *Payments stocks*) is shown as one compact row of % changes. If Yahoo has no price history for an instrument (it has none for SET50), its `fallback:` is used instead: here the TDEX ETF, which tracks SET50, rescaled to SET50's latest value and labelled as approximate. Market data and notes refresh once a day, so the evening digest reuses the morning's (unless you change the `instruments` list).
 
 ## Teaching the bot from the page
 

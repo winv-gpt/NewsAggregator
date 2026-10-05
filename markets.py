@@ -53,6 +53,9 @@ class Instrument:
     name: str
     symbol: str
     points: List[Tuple[str, float]] = field(default_factory=list)   # (YYYY-MM-DD, close), oldest first
+    fallback: Optional[dict] = None   # {symbol, name}: stand-in for the history when Yahoo has none
+    via: str = ""                     # name of the stand-in the points come from, if one was used
+    scaled: bool = False              # stand-in points rescaled to this instrument's own latest close
 
     @property
     def is_yield(self) -> bool:
@@ -88,8 +91,29 @@ def _rows(cfg: dict) -> List[MarketRow]:
             rows.append(MarketRow(entry["name"], [Instrument(g["name"], g["symbol"]) for g in entry["group"]],
                                   group=True))
         else:
-            rows.append(MarketRow(entry["name"], [Instrument(entry["name"], entry["symbol"])]))
+            rows.append(MarketRow(entry["name"], [Instrument(entry["name"], entry["symbol"],
+                                                             fallback=entry.get("fallback"))]))
     return rows
+
+
+def _with_stand_in(inst: Instrument):
+    """When Yahoo has under two days for `inst`, take the history from its fallback (e.g. an ETF that
+    tracks the index). If Yahoo gave the instrument's own latest close, rescale the stand-in to it so
+    the chart reads in the instrument's units and ends on its real value."""
+    if len(inst.points) >= 2 or not inst.fallback:
+        return
+    stand_in = fetch.fetch_prices(inst.fallback["symbol"], "1y")
+    if len(stand_in) < 2:
+        return
+    own = inst.points
+    inst.via, inst.points = inst.fallback.get("name") or inst.fallback["symbol"], stand_in
+    if own:
+        day, close = own[-1]
+        base = next((c for d, c in reversed(stand_in) if d <= day), None)
+        if base:
+            inst.points = [(d, c * close / base) for d, c in stand_in if d < day] + [(day, close)]
+            inst.scaled = True
+    log.info("markets: %s history from %s (%d days)", inst.name, inst.via, len(inst.points))
 
 
 def _news_query(row: MarketRow) -> str:
@@ -151,12 +175,14 @@ def _fake_summaries(rows: List[MarketRow]):
 
 def _to_json(rows: List[MarketRow]) -> list:
     return [{"name": r.name, "group": r.group, "summary": r.summary, "links": r.links,
-             "instruments": [{"name": i.name, "symbol": i.symbol, "points": i.points} for i in r.instruments]}
+             "instruments": [{"name": i.name, "symbol": i.symbol, "points": i.points, "via": i.via,
+                              "scaled": i.scaled} for i in r.instruments]}
             for r in rows]
 
 
 def _from_json(data: list) -> List[MarketRow]:
-    return [MarketRow(r["name"], [Instrument(i["name"], i["symbol"], [tuple(p) for p in i["points"]])
+    return [MarketRow(r["name"], [Instrument(i["name"], i["symbol"], [tuple(p) for p in i["points"]],
+                                             via=i.get("via", ""), scaled=i.get("scaled", False))
                                   for i in r["instruments"]],
                       r["group"], r["summary"], [tuple(l) for l in r["links"]]) for r in data]
 
@@ -180,6 +206,7 @@ def build(interests: dict, cache: Optional[dict], today: str, fake: bool = False
     for row in rows:
         for inst in row.instruments:
             inst.points = fetch.fetch_prices(inst.symbol, "1y")
+            _with_stand_in(inst)
     # An instrument needs at least two closes for a change and a chart.
     missing = [f"{i.name} ({i.symbol}: {len(i.points)} days)" for r in rows for i in r.instruments
                if len(i.points) < 2]

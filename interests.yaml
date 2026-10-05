@@ -113,7 +113,7 @@ presentation:
     - {label: "👎", meaning: less like this}
   webpage:
     layout: cards            # or: list
-    fetch_now_button: true   # button that triggers a fresh fetch
+    fetch_now_button: false  # true shows a "Fetch now" button that opens GitHub's Run workflow page
     show_previous_briefings: false   # earlier briefings section removed
     sections_order: [chelsea_fc, premier_league, big_tech, global_payments,
                      thailand_headlines, thai_politics, global_news, ironman,

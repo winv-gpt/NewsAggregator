@@ -94,6 +94,7 @@ footer ul { list-style:none; padding:0; margin:8px 0 0; display:flex; flex-direc
               pointer-events:none; visibility:hidden; font-variant-numeric:tabular-nums; }
 .axis { display:flex; justify-content:space-between; font-size:11.5px; color:var(--muted); }
 .drivers { font-size:14px; }
+.via { margin:0; font-size:12.5px; color:var(--muted); }
 .drivers .src { color:var(--muted); font-size:12.5px; }
 .drivers .src a { font-size:12.5px; font-weight:400; color:var(--accent); }
 .movers { display:flex; flex-wrap:wrap; gap:8px; }
@@ -300,10 +301,19 @@ def _market_card(row: MarketRow) -> str:
         return (f'<article class="card market"><div class="name">{e(row.name)}</div>'
                 f'<p class="empty">No price data from Yahoo Finance right now ({e(inst.symbol)}).</p>'
                 f'{_drivers(row)}</article>')
-    stats = (f'<b>{_value(inst, inst.last)}</b><span>1 day {_change(inst, 1)}</span>'
+    value = _value(inst, inst.last) if inst.scaled or not inst.via else f"{e(inst.via)}: {_value(inst, inst.last)}"
+    stats = (f'<b>{value}</b><span>1 day {_change(inst, 1)}</span>'
              f'<span>3 mo {_change(inst, QUARTER_DAYS)}</span><span>12 mo {_change(inst, 365)}</span>')
     return (f'<article class="card market"><div class="name">{e(row.name)}</div>'
-            f'<div class="stats">{stats}</div>{_chart(inst)}{_drivers(row)}</article>')
+            f'<div class="stats">{stats}</div>{_chart(inst)}{_via_note(row.name, inst)}{_drivers(row)}</article>')
+
+
+def _via_note(name: str, inst: Instrument) -> str:
+    if not inst.via:
+        return ""
+    what = "The chart and changes are approximate: they come from" if inst.scaled else "These prices are from"
+    return (f'<p class="via">{what} the {html.escape(inst.via)}, because Yahoo Finance has no '
+            f'price history for {html.escape(name)}.</p>')
 
 
 def _markets(rows: List[MarketRow], container: str) -> str:

@@ -13,17 +13,15 @@ Tap **↻ Fetch now** at the top of the page for a fresh briefing outside the sc
 
 ## Markets
 
-The last section shows a 12-month chart for each instrument under `markets:` in `interests.yaml` (prices from Yahoo Finance, with the past quarter shaded), its 1-day / 3-month / 12-month change, and a short note (60 words max) from Claude on what drove the past quarter's move, based only on news headlines and linking to them. A `group:` (like *Payments stocks*) is shown as one compact row of % changes. Market data and notes refresh once a day, so the evening digest reuses the morning's.
+The last section shows a 12-month chart for each instrument under `markets:` in `interests.yaml` (prices from Yahoo Finance, with the past quarter shaded), its 1-day / 3-month / 12-month change, and a short note (60 words max) from Claude on what drove the past quarter's move, based only on news headlines and linking to them. A `group:` (like *Payments stocks*) is shown as one compact row of % changes. Market data and notes refresh once a day, so the evening digest reuses the morning's (unless you change the `instruments` list).
 
 ## Teaching the bot from the page
 
 Every card has these buttons:
 - **👍**: more like this (Claude scores similar stories a little higher).
 - **👎**: less like this (Claude scores similar stories lower).
-- **⭐**: I liked this. It's saved under **⭐ Saved stories** at the bottom of the page, and similar stories score higher still.
-- **Mute {source}**: stop showing stories from that outlet.
 
-Tap as many as you like, then tap **Save to bot**. GitHub opens a pre-filled issue; tap **Create**. The *Save page feedback* workflow writes it into `feedback.yaml` and closes the issue, and it applies from the next briefing. Muted sources are listed at the bottom of the page with **Unmute** boxes. Only issues opened by the repo owner are applied.
+Tap as many as you like, then tap **Save to bot**. GitHub opens a pre-filled issue; tap **Create**. The *Save page feedback* workflow writes it into `feedback.yaml` and closes the issue, and it applies from the next briefing. Only issues opened by the repo owner are applied.
 
 Stock moves for the watchlist come from Yahoo Finance and are scored by fixed rules (over 7% = alert, over 3% = listed), not by Claude.
 
@@ -34,7 +32,7 @@ Stock moves for the watchlist come from Yahoo Finance and are scored by fixed ru
 | `interests.yaml` | Your topics, rules, thresholds and layout. Edit freely. |
 | `feeds.yaml` | Where each source name is fetched from (RSS URL or Google News search). |
 | `run.py` | Entry point: fetch → score → arrange → webpage. |
-| `feedback.yaml` | Your mutes and 👍 / 👎 / ⭐ stories, written by the page's buttons. Editable by hand. |
+| `feedback.yaml` | Your 👍 / 👎 stories, written by the page's buttons. Editable by hand. |
 | `fetch.py` / `score.py` / `markets.py` / `web.py` | The individual steps (`markets.py` builds the Markets section). |
 | `apply_feedback.py` | Saves feedback from a page issue into `feedback.yaml`. |
 | `.github/workflows/newsbot.yml` | Runs the bot twice a day on GitHub Actions and publishes the page. |

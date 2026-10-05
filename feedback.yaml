@@ -1,11 +1,7 @@
-# Your feedback from the page's buttons, saved here automatically (via GitHub issues).
-# Safe to edit by hand: delete an entry to unmute a source or forget an example.
-# muted_sources: stories from these outlets are dropped before scoring.
+# Your feedback from the page's 👍 / 👎 buttons, saved here automatically (via GitHub issues).
+# Safe to edit by hand: delete an entry to forget an example.
 # not_interested: stories you marked 👎; Claude scores similar ones lower.
 # more_like_this: stories you marked 👍; Claude scores similar ones a bit higher.
-# starred: stories you marked ⭐; listed under "Saved stories" and similar ones score higher still.
 
-muted_sources: []
 not_interested: []
 more_like_this: []
-starred: []

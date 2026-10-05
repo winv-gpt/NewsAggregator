@@ -111,7 +111,6 @@ presentation:
   feedback_buttons:          # shown on every item, in Telegram and on the webpage
     - {label: "👍", meaning: more like this}
     - {label: "👎", meaning: less like this}
-    - {label: "⭐", meaning: "I liked this: save it and weight similar stories higher"}
   webpage:
     layout: cards            # or: list
     fetch_now_button: true   # button that triggers a fresh fetch
@@ -138,7 +137,7 @@ markets:
     - {name: "Nasdaq-100 (tech)", symbol: "^NDX"}
     - {name: "Gold", symbol: "GC=F"}
     - {name: "Bitcoin", symbol: "BTC-USD"}
-    - {name: "SET Index (Thailand)", symbol: "^SET.BK"}
+    - {name: "SET50 (Thailand)", symbol: "^SET50.BK"}
     - {name: "USD/THB", symbol: "THB=X"}
     - {name: "US 10-year Treasury yield", symbol: "^TNX"}
     - {name: "Brent crude oil", symbol: "BZ=F"}

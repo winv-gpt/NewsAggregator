@@ -166,7 +166,7 @@ def _examples(entries: List[dict], key: str, limit: int = 25) -> str:
 
 
 def _feedback_block(key: str, feedback: dict, digest_threshold: int) -> str:
-    """The reader's 👎 / 👍 / ⭐ examples for this topic, as scoring guidance."""
+    """The reader's 👎 / 👍 examples for this topic, as scoring guidance."""
     out = ""
     if lines := _examples(feedback.get("not_interested") or [], key):
         out += (f"\n\nThe reader marked these past stories 👎 (less like this). Score stories of the same kind "
@@ -174,9 +174,6 @@ def _feedback_block(key: str, feedback: dict, digest_threshold: int) -> str:
     if lines := _examples(feedback.get("more_like_this") or [], key):
         out += (f"\n\nThe reader marked these past stories 👍 (more like this). Score stories of the same kind "
                 f"about 1 point higher than you otherwise would:\n{lines}")
-    if lines := _examples(feedback.get("starred") or [], key):
-        out += (f"\n\nThe reader starred ⭐ these past stories (liked them most). Score stories of the same kind "
-                f"about 2 points higher than you otherwise would (never above 10):\n{lines}")
     return out
 
 

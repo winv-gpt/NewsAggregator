@@ -143,7 +143,7 @@ def arrange(stories: List[Story], interests: dict, alerts_so_far: int = 0):
 def load_feedback() -> dict:
     path = ROOT / "feedback.yaml"
     data = (yaml.safe_load(path.read_text()) if path.exists() else None) or {}
-    return {k: data.get(k) or [] for k in ("muted_sources", "not_interested", "more_like_this", "starred")}
+    return {k: data.get(k) or [] for k in ("not_interested", "more_like_this")}
 
 
 def briefing_title(interests: dict, local: datetime) -> str:
@@ -153,16 +153,15 @@ def briefing_title(interests: dict, local: datetime) -> str:
     return f"{titles.get(part) or part.title() + ' briefing'} · {local:%a %d %b}"
 
 
-def write_site(title: str, slug: str, now: datetime, alerts, digest, interests: dict, feedback: dict,
+def write_site(title: str, slug: str, now: datetime, alerts, digest, interests: dict,
                market_rows: List[markets.MarketRow]):
     """Rebuild site/. With show_previous_briefings on, also archive this briefing and link the last 7 days."""
     repo = os.environ.get("GITHUB_REPOSITORY") or "winv-gpt/NewsAggregator"
-    common = dict(repo=repo, markets=market_rows, starred=feedback["starred"])
+    common = dict(repo=repo, markets=market_rows)
     shutil.rmtree(SITE_DIR, ignore_errors=True)
     SITE_DIR.mkdir()
     if not interests["presentation"]["webpage"].get("show_previous_briefings", True):
-        (SITE_DIR / "index.html").write_text(web.render(title, now, alerts, digest, interests,
-                                                        muted=feedback["muted_sources"], **common))
+        (SITE_DIR / "index.html").write_text(web.render(title, now, alerts, digest, interests, **common))
         log.info("webpage written to %s", SITE_DIR / "index.html")
         return
 
@@ -182,7 +181,7 @@ def write_site(title: str, slug: str, now: datetime, alerts, digest, interests: 
 
     shutil.copytree(ARCHIVE_DIR, SITE_DIR / "archive")
     (SITE_DIR / "index.html").write_text(web.render(title, now, alerts, digest, interests, earlier=earlier,
-                                                    muted=feedback["muted_sources"], **common))
+                                                    **common))
     log.info("webpage written to %s (%d earlier briefings)", SITE_DIR / "index.html", len(earlier))
 
 
@@ -205,12 +204,10 @@ def main():
     log.info("collecting news since %s", since.astimezone(local.tzinfo).strftime("%a %H:%M"))
 
     feedback = load_feedback()
-    muted = {m.casefold() for m in feedback["muted_sources"]}
     items_by_topic = fetch.fetch_all(interests, feeds, since)
     done = state["sent"].keys() | state.get("seen", {}).keys()
     for topic in items_by_topic:
-        items_by_topic[topic] = [i for i in items_by_topic[topic]
-                                 if i.id not in done and i.source.casefold() not in muted]
+        items_by_topic[topic] = [i for i in items_by_topic[topic] if i.id not in done]
 
     recent = list(dict.fromkeys(v["headline"] for v in state["sent"].values()))[-150:]
     if args.fake_scores:
@@ -238,7 +235,7 @@ def main():
 
     part = "morning" if local.hour < 12 else "evening"
     write_site(briefing_title(interests, local), f"{today}-{part}",
-               now, alerts, digest, interests, feedback, market_rows)
+               now, alerts, digest, interests, market_rows)
     if not args.preview:
         save_state(state, shown, checked, now, {"date": today, "count": so_far + len(alerts)})
         if market_cache:

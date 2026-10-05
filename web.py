@@ -21,10 +21,8 @@ TOPIC_LABELS = {
 }
 
 # Which page action each feedback button in interests.yaml (presentation.feedback_buttons) performs.
-FEEDBACK_KINDS = {"👍": "like", "👎": "meh", "⭐": "star"}
-DEFAULT_BUTTONS = [{"label": "👍", "meaning": "more like this"}, {"label": "👎", "meaning": "less like this"},
-                   {"label": "⭐", "meaning": "save it and weight similar stories higher"}]
-SAVED_SHOWN = 10
+FEEDBACK_KINDS = {"👍": "like", "👎": "meh"}
+DEFAULT_BUTTONS = [{"label": "👍", "meaning": "more like this"}, {"label": "👎", "meaning": "less like this"}]
 
 
 def label(topic: str) -> str:
@@ -72,13 +70,10 @@ h2 { font-size:15px; text-transform:uppercase; letter-spacing:.06em; color:var(-
 .fb .chip input { position:absolute; opacity:0; pointer-events:none; }
 .fb .chip:has(input:checked) { background:var(--chip-on); border-color:var(--accent); }
 .fb .chip:has(input:focus-visible) { outline:2px solid var(--accent); outline-offset:2px; }
-.fb .mute { margin-left:auto; }
 .empty { color:var(--muted); }
 header nav a, footer a { color:var(--accent); text-decoration:none; font-size:14px; }
 footer { margin-top:36px; padding-top:16px; border-top:1px solid var(--line); }
 footer ul { list-style:none; padding:0; margin:8px 0 0; display:flex; flex-direction:column; gap:6px; }
-footer .fb { border:0; padding:0; }
-.saved small { color:var(--muted); }
 .market { gap:8px; }
 .market .name { font-weight:600; font-size:16px; }
 .stats { display:flex; flex-wrap:wrap; gap:4px 14px; font-size:13px; color:var(--muted); }
@@ -123,26 +118,22 @@ const store = {
   get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
 };
-const EMPTY = () => ({mute: [], unmute: [], meh: [], like: [], star: []});
-let pending = Object.assign(EMPTY(), store.get("newsbot-pending", {}));
-const muted = new Set(store.get("newsbot-muted", []));
-const STORY_KINDS = ["meh", "like", "star"];
+const EMPTY = () => ({meh: [], like: []});
+const saved = store.get("newsbot-pending", {});
+let pending = {meh: saved.meh || [], like: saved.like || []};
+const KINDS = ["meh", "like"];
 
 function refresh() {
   document.querySelectorAll(".card[data-headline]").forEach(card => {
-    const src = card.dataset.source, head = card.dataset.headline;
-    const m = card.querySelector('[data-kind="mute"]');
-    m.checked = pending.mute.includes(src);
-    STORY_KINDS.forEach(k => {
+    const head = card.dataset.headline;
+    KINDS.forEach(k => {
       const box = card.querySelector(`[data-kind="${k}"]`);
       if (box) box.checked = pending[k].some(x => x.headline === head);
     });
     const meh = card.querySelector('[data-kind="meh"]');
-    card.classList.toggle("dim", m.checked || !!(meh && meh.checked));
-    card.hidden = muted.has(src) && !pending.unmute.includes(src);
+    card.classList.toggle("dim", !!(meh && meh.checked));
   });
-  document.querySelectorAll('[data-kind="unmute"]').forEach(b => { b.checked = pending.unmute.includes(b.dataset.source); });
-  const count = pending.mute.length + pending.unmute.length + STORY_KINDS.reduce((n, k) => n + pending[k].length, 0);
+  const count = KINDS.reduce((n, k) => n + pending[k].length, 0);
   document.getElementById("count").textContent = count === 1 ? "1 change" : count + " changes";
   document.getElementById("bar").classList.toggle("show", count > 0);
   store.set("newsbot-pending", pending);
@@ -152,39 +143,25 @@ document.addEventListener("change", e => {
   const box = e.target, kind = box.dataset.kind;
   if (!kind) return;
   const card = box.closest(".card");
-  if (kind === "mute" || kind === "unmute") {
-    const src = kind === "mute" ? card.dataset.source : box.dataset.source;
-    pending[kind] = pending[kind].filter(s => s !== src);
-    if (box.checked) pending[kind].push(src);
-  } else {
-    const item = {topic: card.dataset.topic, headline: card.dataset.headline, source: card.dataset.source};
-    if (kind === "star") item.link = card.dataset.link;
-    pending[kind] = pending[kind].filter(x => x.headline !== item.headline);
-    if (box.checked) {
-      pending[kind].push(item);
-      const other = {like: "meh", meh: "like"}[kind];   // 👍 and 👎 cancel each other out
-      if (other) pending[other] = pending[other].filter(x => x.headline !== item.headline);
-    }
+  const item = {topic: card.dataset.topic, headline: card.dataset.headline, source: card.dataset.source};
+  pending[kind] = pending[kind].filter(x => x.headline !== item.headline);
+  if (box.checked) {
+    pending[kind].push(item);
+    const other = {like: "meh", meh: "like"}[kind];   // 👍 and 👎 cancel each other out
+    pending[other] = pending[other].filter(x => x.headline !== item.headline);
   }
   refresh();
 });
 
 document.getElementById("save").addEventListener("click", () => {
-  const data = {mute_sources: pending.mute, unmute_sources: pending.unmute, not_interested: pending.meh,
-                more_like_this: pending.like, starred: pending.star};
+  const data = {not_interested: pending.meh, more_like_this: pending.like};
   const parts = [];
-  if (data.mute_sources.length) parts.push("mute " + data.mute_sources.join(", "));
-  if (data.unmute_sources.length) parts.push("unmute " + data.unmute_sources.join(", "));
   if (data.more_like_this.length) parts.push(data.more_like_this.length + " 👍");
   if (data.not_interested.length) parts.push(data.not_interested.length + " 👎");
-  if (data.starred.length) parts.push(data.starred.length + " ⭐");
   const title = "Newsbot feedback: " + parts.join("; ");
   const body = "Tap **Create** to save this feedback. It applies from the next briefing.\\n\\n" +
                "```json\\n" + JSON.stringify(data, null, 1) + "\\n```";
   window.open(`https://github.com/${REPO}/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`, "_blank");
-  pending.mute.forEach(s => muted.add(s));
-  pending.unmute.forEach(s => muted.delete(s));
-  store.set("newsbot-muted", [...muted]);
   pending = EMPTY();
   refresh();
   const bar = document.getElementById("bar");
@@ -221,7 +198,7 @@ document.querySelectorAll(".chart").forEach(chart => {
 """
 
 
-def _feedback_controls(buttons: List[dict], source: str) -> str:
+def _feedback_controls(buttons: List[dict]) -> str:
     e = html.escape
     chips = []
     for b in buttons:
@@ -230,8 +207,7 @@ def _feedback_controls(buttons: List[dict], source: str) -> str:
             meaning = e(str(b.get("meaning", "")), quote=True)
             chips.append(f'<label class="chip" title="{meaning}"><input type="checkbox" data-kind="{kind}" '
                          f'aria-label="{meaning}">{e(b["label"])}</label>')
-    chips.append(f'<label class="mute"><input type="checkbox" data-kind="mute"> Mute {e(source)}</label>')
-    return f'<div class="fb">{"".join(chips)}</div>'
+    return f'<div class="fb">{"".join(chips)}</div>' if chips else ""
 
 
 def _card(story: Story, tz: ZoneInfo, alert_threshold: int, show: List[str], buttons: List[dict],
@@ -252,9 +228,10 @@ def _card(story: Story, tz: ZoneInfo, alert_threshold: int, show: List[str], but
         parts.append(f"<p>{e(story.summary)}</p>")
     parts.append(f'<div class="meta">{" · ".join(meta)}</div>')
     source = story.sources[0]
-    parts.append(_feedback_controls(buttons, source))
+    if controls := _feedback_controls(buttons):
+        parts.append(controls)
     attrs = (f'data-topic="{e(story.topic, quote=True)}" data-source="{e(source, quote=True)}" '
-             f'data-headline="{e(story.headline, quote=True)}" data-link="{e(story.link, quote=True)}"')
+             f'data-headline="{e(story.headline, quote=True)}"')
     return f'<article class="card{" alert" if is_alert else ""}" {attrs}>{"".join(parts)}</article>'
 
 
@@ -314,14 +291,15 @@ def _market_card(row: MarketRow) -> str:
     if row.group:
         movers = "".join(
             f'<div class="mover"><b>{e(i.name)}</b><span>3 mo {_change(i, QUARTER_DAYS)} · '
-            f'12 mo {_change(i, 365)}</span></div>' for i in row.instruments if i.points)
-        if not movers:
-            return ""
+            f'12 mo {_change(i, 365)}</span></div>' if len(i.points) >= 2 else
+            f'<div class="mover"><b>{e(i.name)}</b><span>no price data</span></div>' for i in row.instruments)
         return (f'<article class="card market"><div class="name">{e(row.name)}</div>'
                 f'<div class="movers">{movers}</div>{_drivers(row)}</article>')
     inst = row.instruments[0]
-    if len(inst.points) < 2:
-        return ""
+    if len(inst.points) < 2:   # keep the card, so a missing market is visible rather than silently dropped
+        return (f'<article class="card market"><div class="name">{e(row.name)}</div>'
+                f'<p class="empty">No price data from Yahoo Finance right now ({e(inst.symbol)}).</p>'
+                f'{_drivers(row)}</article>')
     stats = (f'<b>{_value(inst, inst.last)}</b><span>1 day {_change(inst, 1)}</span>'
              f'<span>3 mo {_change(inst, QUARTER_DAYS)}</span><span>12 mo {_change(inst, 365)}</span>')
     return (f'<article class="card market"><div class="name">{e(row.name)}</div>'
@@ -331,19 +309,18 @@ def _market_card(row: MarketRow) -> str:
 def _markets(rows: List[MarketRow], container: str) -> str:
     if not rows:
         return ""
-    cards = "".join(_market_card(r) for r in rows)
-    body = (f'<div class="{container}">{cards}</div>' if cards
-            else '<p class="empty">Market data is unavailable right now.</p>')
+    if any(len(i.points) >= 2 for r in rows for i in r.instruments):
+        body = f'<div class="{container}">{"".join(_market_card(r) for r in rows)}</div>'
+    else:
+        body = '<p class="empty">Market data is unavailable right now.</p>'
     return f'<h2>{html.escape(label("markets"))}</h2>{body}'
 
 
 def render(title: str, generated: datetime, alerts: List[Story], digest: Dict[str, List[Story]],
            interests: dict, earlier: List[Tuple[str, str]] = (), home: str = "",
-           repo: str = "", muted: List[str] = (), markets: Optional[List[MarketRow]] = None,
-           starred: List[dict] = ()) -> str:
+           repo: str = "", markets: Optional[List[MarketRow]] = None) -> str:
     """`earlier`: (label, href) links to previous briefings. `home`: link back to the latest one.
-    `repo`: owner/name that receives feedback issues and runs the bot. `muted`: currently muted sources.
-    `markets`: rows for the Markets section. `starred`: saved ⭐ stories from feedback.yaml."""
+    `repo`: owner/name that receives feedback issues and runs the bot. `markets`: rows for the Markets section."""
     tz = ZoneInfo(interests["owner"]["timezone"])
     presentation = interests["presentation"]
     page = presentation["webpage"]
@@ -390,8 +367,6 @@ def render(title: str, generated: datetime, alerts: List[Story], digest: Dict[st
 <p>Updated {generated.astimezone(tz).strftime("%A %d %B, %H:%M")} ({interests["owner"]["timezone"]})</p>
 {f'<nav><a href="{home}">← Latest briefing</a></nav>' if home else ""}</div>{fetch_now}</header>
 {"".join(sections)}
-{_saved(starred)}
-{_muted(muted)}
 {_earlier(earlier)}
 </main>
 <div id="bar" role="status"><span id="count"></span>
@@ -400,25 +375,6 @@ def render(title: str, generated: datetime, alerts: List[Story], digest: Dict[st
 <script>{script}</script>
 </body></html>
 """
-
-
-def _saved(starred: List[dict]) -> str:
-    entries = [s for s in starred if s.get("link")][-SAVED_SHOWN:][::-1]
-    if not entries:
-        return ""
-    items = "".join(f'<li><a href="{html.escape(s["link"], quote=True)}" target="_blank" rel="noopener">'
-                    f'{html.escape(s["headline"])}</a> <small>{html.escape(s.get("source", ""))}</small></li>'
-                    for s in entries)
-    return f'<footer class="saved"><h2>⭐ Saved stories</h2><ul>{items}</ul></footer>'
-
-
-def _muted(sources: List[str]) -> str:
-    if not sources:
-        return ""
-    items = "".join(f'<li class="fb"><label><input type="checkbox" data-kind="unmute" '
-                    f'data-source="{html.escape(s, quote=True)}"> Unmute {html.escape(s)}</label></li>'
-                    for s in sources)
-    return f"<footer><h2>Muted sources</h2><ul>{items}</ul></footer>"
 
 
 def _earlier(links: List[Tuple[str, str]]) -> str:

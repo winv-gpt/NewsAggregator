@@ -180,8 +180,13 @@ def build(interests: dict, cache: Optional[dict], today: str, fake: bool = False
     for row in rows:
         for inst in row.instruments:
             inst.points = fetch.fetch_prices(inst.symbol, "1y")
-    priced = sum(1 for r in rows for i in r.instruments if i.points)
+    # An instrument needs at least two closes for a change and a chart.
+    missing = [f"{i.name} ({i.symbol}: {len(i.points)} days)" for r in rows for i in r.instruments
+               if len(i.points) < 2]
+    priced = sum(len(r.instruments) for r in rows) - len(missing)
     log.info("markets: prices for %d of %d instruments", priced, sum(len(r.instruments) for r in rows))
+    if missing:
+        log.warning("markets: not enough price history for %s", ", ".join(missing))
     if not priced:
         return rows, cache or {}
 

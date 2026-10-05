@@ -291,14 +291,15 @@ def _market_card(row: MarketRow) -> str:
     if row.group:
         movers = "".join(
             f'<div class="mover"><b>{e(i.name)}</b><span>3 mo {_change(i, QUARTER_DAYS)} · '
-            f'12 mo {_change(i, 365)}</span></div>' for i in row.instruments if i.points)
-        if not movers:
-            return ""
+            f'12 mo {_change(i, 365)}</span></div>' if len(i.points) >= 2 else
+            f'<div class="mover"><b>{e(i.name)}</b><span>no price data</span></div>' for i in row.instruments)
         return (f'<article class="card market"><div class="name">{e(row.name)}</div>'
                 f'<div class="movers">{movers}</div>{_drivers(row)}</article>')
     inst = row.instruments[0]
-    if len(inst.points) < 2:
-        return ""
+    if len(inst.points) < 2:   # keep the card, so a missing market is visible rather than silently dropped
+        return (f'<article class="card market"><div class="name">{e(row.name)}</div>'
+                f'<p class="empty">No price data from Yahoo Finance right now ({e(inst.symbol)}).</p>'
+                f'{_drivers(row)}</article>')
     stats = (f'<b>{_value(inst, inst.last)}</b><span>1 day {_change(inst, 1)}</span>'
              f'<span>3 mo {_change(inst, QUARTER_DAYS)}</span><span>12 mo {_change(inst, 365)}</span>')
     return (f'<article class="card market"><div class="name">{e(row.name)}</div>'
@@ -308,9 +309,10 @@ def _market_card(row: MarketRow) -> str:
 def _markets(rows: List[MarketRow], container: str) -> str:
     if not rows:
         return ""
-    cards = "".join(_market_card(r) for r in rows)
-    body = (f'<div class="{container}">{cards}</div>' if cards
-            else '<p class="empty">Market data is unavailable right now.</p>')
+    if any(len(i.points) >= 2 for r in rows for i in r.instruments):
+        body = f'<div class="{container}">{"".join(_market_card(r) for r in rows)}</div>'
+    else:
+        body = '<p class="empty">Market data is unavailable right now.</p>'
     return f'<h2>{html.escape(label("markets"))}</h2>{body}'
 
 

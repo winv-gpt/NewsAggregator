@@ -9,7 +9,7 @@ Each run:
 2. Asks Claude (Sonnet 5 by default) to merge duplicate stories, translate Thai items, and score each story 0–10 against your rules in `interests.yaml`.
 3. Rebuilds the page: **Alerts** (score 8+, at most 6 a day) at the top, then each topic's stories (5–7), each with a one-sentence summary (25 words max), then **Markets** at the bottom.
 
-Tap **↻ Fetch now** at the top of the page for a fresh briefing outside the schedule: it opens GitHub's *News briefing* page, where you tap **Run workflow** (then the green **Run workflow** button). Reload the page about 3 minutes later.
+For a fresh briefing outside the schedule, open GitHub's *Actions → News briefing* page and tap **Run workflow** (then the green **Run workflow** button). Reload the page about 3 minutes later. Setting `fetch_now_button: true` in `interests.yaml` puts a **↻ Fetch now** shortcut to that page at the top of the briefing.
 
 ## Markets
 

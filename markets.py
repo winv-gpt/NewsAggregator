@@ -168,9 +168,13 @@ def build(interests: dict, cache: Optional[dict], today: str, fake: bool = False
     if not cfg.get("instruments"):
         return [], cache or {}
     daily = cfg.get("refresh", "daily") == "daily"
+    # Reuse today's data unless the instrument list in interests.yaml changed since it was cached.
+    wanted = [(r.name, [i.symbol for i in r.instruments]) for r in _rows(cfg)]
     if daily and cache and cache.get("date") == today and not fake:
-        log.info("markets: reusing today's data")
-        return _from_json(cache["rows"]), cache
+        cached = _from_json(cache["rows"])
+        if [(r.name, [i.symbol for i in r.instruments]) for r in cached] == wanted:
+            log.info("markets: reusing today's data")
+            return cached, cache
 
     rows = _rows(cfg)
     for row in rows:

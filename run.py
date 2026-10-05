@@ -20,11 +20,13 @@ warnings.filterwarnings("ignore", message=".*OpenSSL.*")  # harmless urllib3 not
 import yaml
 
 import fetch
+import markets
 import web
-from score import Story, score_all
+from score import Story, max_words, score_all, thresholds
 
 ROOT = Path(__file__).parent
 STATE_FILE = ROOT / "state" / "state.json"
+MARKETS_FILE = ROOT / "state" / "markets.json"   # today's market prices and summaries (refreshed daily)
 SITE_DIR = ROOT / "site"
 ARCHIVE_DIR = ROOT / "state" / "archive"   # past briefings, carried between runs with the state
 KEEP_SENT_DAYS = 7
@@ -49,8 +51,9 @@ def load_state() -> dict:
     return {"last_run": None, "sent": {}, "seen": {}}
 
 
-def save_state(state: dict, stories: List[Story], checked: List[str], now: datetime):
-    """`sent`: items shown on the page (their headlines feed dedupe). `seen`: every item already scored."""
+def save_state(state: dict, stories: List[Story], checked: List[str], now: datetime, alerts_today: dict):
+    """`sent`: items shown on the page (their headlines feed dedupe). `seen`: every item already scored.
+    `alerts_today`: {"date", "count"} of alerts shown today, for the daily alert cap."""
     cutoff = (now - timedelta(days=KEEP_SENT_DAYS)).isoformat()
     sent = {k: v for k, v in state["sent"].items() if v["at"] >= cutoff}
     seen = {k: v for k, v in state.get("seen", {}).items() if v >= cutoff}
@@ -59,8 +62,8 @@ def save_state(state: dict, stories: List[Story], checked: List[str], now: datet
             sent[item_id] = {"at": now.isoformat(), "headline": s.headline}
     seen.update({i: now.isoformat() for i in checked})
     STATE_FILE.parent.mkdir(exist_ok=True)
-    STATE_FILE.write_text(json.dumps({"last_run": now.isoformat(), "sent": sent, "seen": seen},
-                                     ensure_ascii=False, indent=1))
+    STATE_FILE.write_text(json.dumps({"last_run": now.isoformat(), "sent": sent, "seen": seen,
+                                      "alerts_today": alerts_today}, ensure_ascii=False, indent=1))
 
 
 def stock_stories(interests: dict, sent: dict) -> List[Story]:
@@ -73,8 +76,8 @@ def stock_stories(interests: dict, sent: dict) -> List[Story]:
         sid = f"stock:{m.ticker}:{m.date}"
         if abs(m.pct) < digest_pct or sid in sent:
             continue
-        score = interests["alerts"]["alert_threshold"] + 1 if abs(m.pct) >= alert_pct else \
-            interests["alerts"]["digest_threshold"] + 1
+        alert, digest = thresholds(interests)
+        score = alert + 1 if abs(m.pct) >= alert_pct else digest + 1
         arrow = "▲" if m.pct > 0 else "▼"
         stories.append(Story(
             id=sid, topic="big_tech", score=score,
@@ -86,19 +89,26 @@ def stock_stories(interests: dict, sent: dict) -> List[Story]:
     return stories
 
 
-def fake_scores(items_by_topic: Dict[str, List[fetch.Item]]) -> List[Story]:
+def fake_scores(items_by_topic: Dict[str, List[fetch.Item]], words: int) -> List[Story]:
     """Stand-in for Claude, for testing layout and delivery without an API key."""
     stories = []
     for topic, items in items_by_topic.items():
         for n, i in enumerate(items[:6]):
+            summary = " ".join(i.summary.split()[:words]) or "(no summary)"
             stories.append(Story(i.id, topic, 9 if n == 0 and topic == "chelsea_fc" else 6, i.title,
-                                 i.summary[:140] or "(no summary)", i.link, [i.source], i.published, [i.id]))
+                                 summary, i.link, [i.source], i.published, [i.id]))
     return stories
 
 
-def arrange(stories: List[Story], interests: dict):
-    """Drop cross-topic duplicates, then split into capped alerts and a per-topic digest."""
+def arrange(stories: List[Story], interests: dict, alerts_so_far: int = 0):
+    """Drop cross-topic duplicates, then split into capped alerts and a per-topic digest.
+    `alerts_so_far`: alerts already shown today, which count towards `max_instant_per_day`."""
     alerts_cfg = interests["alerts"]
+    alert_threshold, digest_threshold = thresholds(interests)
+    if "max_instant_per_day" in alerts_cfg:
+        cap = max(0, alerts_cfg["max_instant_per_day"] - alerts_so_far)
+    else:
+        cap = alerts_cfg.get("max_alerts_per_run", 5)
     page = interests["presentation"]["webpage"]
     per_section = page.get("items_per_section", 5)
     order = page.get("sections_order") or list(interests["topics"])
@@ -113,10 +123,10 @@ def arrange(stories: List[Story], interests: dict):
     alerts, overflow = [], []
     uncapped = set(alerts_cfg.get("never_capped", []))
     rank = {t: n for n, t in enumerate(order)}
-    candidates = sorted((s for s in kept if s.score >= alerts_cfg["alert_threshold"]),
+    candidates = sorted((s for s in kept if s.score >= alert_threshold),
                         key=lambda s: (s.topic not in uncapped, -s.score, rank.get(s.topic, 99)))
     for s in candidates:
-        if s.topic in uncapped or len(alerts) < alerts_cfg.get("max_alerts_per_run", 5):
+        if s.topic in uncapped or len(alerts) < cap:
             alerts.append(s)
         else:
             overflow.append(s)
@@ -125,24 +135,40 @@ def arrange(stories: List[Story], interests: dict):
     digest = {}
     for topic in order:
         rest = [s for s in kept if s.topic == topic and s.id not in alert_ids
-                and s.score >= alerts_cfg["digest_threshold"]]
+                and s.score >= digest_threshold]
         digest[topic] = sorted(rest, key=lambda s: -s.score)[:per_section]
     return alerts, digest
 
 
 def load_feedback() -> dict:
     path = ROOT / "feedback.yaml"
-    data = yaml.safe_load(path.read_text()) if path.exists() else None
-    return {"muted_sources": (data or {}).get("muted_sources") or [],
-            "not_interested": (data or {}).get("not_interested") or []}
+    data = (yaml.safe_load(path.read_text()) if path.exists() else None) or {}
+    return {k: data.get(k) or [] for k in ("muted_sources", "not_interested", "more_like_this", "starred")}
 
 
-def write_site(title: str, slug: str, now: datetime, alerts, digest, interests: dict, muted: List[str]):
-    """Write this briefing to the archive, prune old ones, and rebuild site/ from them."""
+def briefing_title(interests: dict, local: datetime) -> str:
+    """Morning title before 12:00, evening title from 12:00 (presentation.titles), plus the date."""
+    part = "morning" if local.hour < 12 else "evening"
+    titles = interests["presentation"].get("titles") or {}
+    return f"{titles.get(part) or part.title() + ' briefing'} · {local:%a %d %b}"
+
+
+def write_site(title: str, slug: str, now: datetime, alerts, digest, interests: dict, feedback: dict,
+               market_rows: List[markets.MarketRow]):
+    """Rebuild site/. With show_previous_briefings on, also archive this briefing and link the last 7 days."""
     repo = os.environ.get("GITHUB_REPOSITORY") or "winv-gpt/NewsAggregator"
+    common = dict(repo=repo, markets=market_rows, starred=feedback["starred"])
+    shutil.rmtree(SITE_DIR, ignore_errors=True)
+    SITE_DIR.mkdir()
+    if not interests["presentation"]["webpage"].get("show_previous_briefings", True):
+        (SITE_DIR / "index.html").write_text(web.render(title, now, alerts, digest, interests,
+                                                        muted=feedback["muted_sources"], **common))
+        log.info("webpage written to %s", SITE_DIR / "index.html")
+        return
+
     ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
     (ARCHIVE_DIR / f"{slug}.html").write_text(
-        web.render(title, now, alerts, digest, interests, home="../", repo=repo))
+        web.render(title, now, alerts, digest, interests, home="../", **common))
     cutoff = (now - timedelta(days=KEEP_SENT_DAYS)).strftime("%Y-%m-%d")
     for old in ARCHIVE_DIR.glob("*.html"):
         if old.stem < cutoff:
@@ -154,10 +180,9 @@ def write_site(title: str, slug: str, now: datetime, alerts, digest, interests: 
             day, part = f.stem.rsplit("-", 1)
             earlier.append((f"{datetime.strptime(day, '%Y-%m-%d'):%a %d %b} · {part}", f"archive/{f.name}"))
 
-    shutil.rmtree(SITE_DIR, ignore_errors=True)
     shutil.copytree(ARCHIVE_DIR, SITE_DIR / "archive")
     (SITE_DIR / "index.html").write_text(web.render(title, now, alerts, digest, interests, earlier=earlier,
-                                                        repo=repo, muted=muted))
+                                                    muted=feedback["muted_sources"], **common))
     log.info("webpage written to %s (%d earlier briefings)", SITE_DIR / "index.html", len(earlier))
 
 
@@ -189,9 +214,9 @@ def main():
 
     recent = list(dict.fromkeys(v["headline"] for v in state["sent"].values()))[-150:]
     if args.fake_scores:
-        stories, failed = fake_scores(items_by_topic), []
+        stories, failed = fake_scores(items_by_topic, max_words(interests)), []
     else:
-        stories, failed = score_all(interests, items_by_topic, recent, feedback["not_interested"])
+        stories, failed = score_all(interests, items_by_topic, recent, feedback)
     attempted = [t for t, items in items_by_topic.items() if items]
     if attempted and len(failed) == len(attempted):
         raise SystemExit("Claude could not score any topic (see errors above); page and memory left unchanged")
@@ -201,15 +226,23 @@ def main():
     checked = list({i.id for t, items in items_by_topic.items() if t not in failed for i in items})
 
     stories += stock_stories(interests, state["sent"])
-    alerts, digest = arrange(stories, interests)
+    today = local.strftime("%Y-%m-%d")
+    alerts_today = state.get("alerts_today") or {}
+    so_far = alerts_today.get("count", 0) if alerts_today.get("date") == today else 0
+    alerts, digest = arrange(stories, interests, so_far)
     shown = alerts + [s for ss in digest.values() for s in ss]
     log.info("%d alerts, %d digest stories", len(alerts), len(shown) - len(alerts))
 
-    part = "Morning" if local.hour < 12 else "Evening"
-    write_site(f"{part} briefing · {local:%a %d %b}", f"{local:%Y-%m-%d}-{part.lower()}",
-               now, alerts, digest, interests, feedback["muted_sources"])
+    market_cache = json.loads(MARKETS_FILE.read_text()) if MARKETS_FILE.exists() else None
+    market_rows, market_cache = markets.build(interests, market_cache, today, fake=args.fake_scores)
+
+    part = "morning" if local.hour < 12 else "evening"
+    write_site(briefing_title(interests, local), f"{today}-{part}",
+               now, alerts, digest, interests, feedback, market_rows)
     if not args.preview:
-        save_state(state, shown, checked, now)
+        save_state(state, shown, checked, now, {"date": today, "count": so_far + len(alerts)})
+        if market_cache:
+            MARKETS_FILE.write_text(json.dumps(market_cache, ensure_ascii=False))
 
 
 if __name__ == "__main__":

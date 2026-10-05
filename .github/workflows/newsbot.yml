@@ -2,11 +2,11 @@ name: News briefing
 
 on:
   schedule:
-    # GitHub runs cron in UTC and often starts a few minutes late, so these fire
-    # just before 07:00 and 17:00 Asia/Bangkok (UTC+7).
-    - cron: "50 23 * * *"
-    - cron: "50 9 * * *"
-  workflow_dispatch:   # adds a "Run workflow" button for manual runs
+    # GitHub runs cron in UTC and often starts a few minutes late, so these fire just before
+    # 06:30 and 18:00 Asia/Bangkok (UTC+7): interests.yaml's morning_briefing_time / evening_digest_time.
+    - cron: "20 23 * * *"
+    - cron: "50 10 * * *"
+  workflow_dispatch:   # the "Run workflow" button, which the page's "Fetch now" button links to
 
 permissions:
   contents: read

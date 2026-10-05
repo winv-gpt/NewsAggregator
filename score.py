@@ -27,9 +27,9 @@ For the topic:
    - {digest}-{alert_minus}: meets the topic's `digest_if` rule.
    - below {digest}: everything else, including anything matching `ignore` rules.
    Respect caps in the rules (e.g. "top 5", "max 3 per day") by scoring the rest below {digest}.
-3. Write a neutral English headline and a 2-3 sentence English summary for each story, translating
-   any non-English source. The summary should say what happened and why it matters, so the reader
-   rarely needs to open the article. Base it only on the items given; do not add facts.
+3. Write a neutral English headline and a one-sentence English summary of at most {max_words} words
+   for each story, translating any non-English source. The summary should say what happened and,
+   if room allows, why it matters. Base it only on the items given; do not add facts.
 
 Global ignore rules: {ignore}
 
@@ -47,7 +47,7 @@ SCHEMA = {
                                  "description": "ids of every input item covering this story, most authoritative first"},
                     "score": {"type": "integer", "description": "0-10"},
                     "headline": {"type": "string"},
-                    "summary": {"type": "string", "description": "2-3 sentences"},
+                    "summary": {"type": "string", "description": "one short sentence"},
                 },
                 "required": ["item_ids", "score", "headline", "summary"],
                 "additionalProperties": False,
@@ -72,29 +72,45 @@ class Story:
     item_ids: List[str]
 
 
+def thresholds(interests: dict) -> Tuple[int, int]:
+    """(alert, digest) score thresholds. Accepts the current and the older interests.yaml key names."""
+    a = interests["alerts"]
+    return a.get("instant_push", a.get("alert_threshold", 8)), a.get("daily_digest", a.get("digest_threshold", 5))
+
+
+def max_words(interests: dict) -> int:
+    return ((interests.get("presentation") or {}).get("summaries") or {}).get("max_words", 25)
+
+
+def make_client() -> anthropic.Anthropic:
+    # Keys not scoped to a workspace must name one; workspace-scoped keys need nothing extra.
+    workspace = os.environ.get("ANTHROPIC_WORKSPACE_ID")
+    return anthropic.Anthropic(default_headers={"anthropic-workspace-id": workspace} if workspace else None)
+
+
 def _topic_rules(topic: dict) -> str:
     rules = {k: v for k, v in topic.items() if k not in ("sources", "watchlist")}
     return yaml.safe_dump(rules, sort_keys=False, allow_unicode=True)
 
 
 def score_topic(client: anthropic.Anthropic, interests: dict, key: str, items: List[Item],
-                recent_headlines: List[str], not_interested: List[dict]) -> Optional[List[Story]]:
+                recent_headlines: List[str], feedback: dict) -> Optional[List[Story]]:
     """Return the topic's stories, or None if Claude could not score it."""
     if not items:
         return []
-    alerts = interests["alerts"]
+    alert, digest = thresholds(interests)
     system = SYSTEM.format(
         name=interests["owner"]["name"], tz=interests["owner"]["timezone"],
-        alert=alerts["alert_threshold"], digest=alerts["digest_threshold"],
-        alert_minus=alerts["alert_threshold"] - 1, ignore="; ".join(interests.get("ignore", [])),
+        alert=alert, digest=digest, alert_minus=alert - 1, max_words=max_words(interests),
+        ignore="; ".join(interests.get("ignore", [])),
     )
     payload = [{"id": i.id, "source": i.source, "title": i.title, "summary": i.summary,
                 "published": i.published.isoformat() if i.published else None} for i in items]
     user = (f"Topic: {key}\n\nTopic rules:\n{_topic_rules(interests['topics'][key])}\n"
             f"Headlines already sent in the last few days (score any repeat of these below "
-            f"{alerts['digest_threshold']} unless there is a genuinely new development):\n"
+            f"{digest} unless there is a genuinely new development):\n"
             + ("\n".join(f"- {h}" for h in recent_headlines) or "(none)")
-            + _not_interested_block(key, not_interested, alerts["digest_threshold"])
+            + _feedback_block(key, feedback, digest)
             + f"\n\nItems:\n{json.dumps(payload, ensure_ascii=False)}")
 
     try:
@@ -144,24 +160,33 @@ def score_topic(client: anthropic.Anthropic, interests: dict, key: str, items: L
     return stories
 
 
-def _not_interested_block(key: str, feedback: List[dict], digest_threshold: int) -> str:
-    examples = [f for f in feedback if f.get("topic") == key][-25:]
-    if not examples:
-        return ""
-    lines = "\n".join(f"- {f['headline']} ({f.get('source', '')})" for f in examples)
-    return (f"\n\nThe reader marked these past stories 'not interested'. Score stories of the same kind "
-            f"below {digest_threshold}, unless they meet the instant_alert_if rule:\n{lines}")
+def _examples(entries: List[dict], key: str, limit: int = 25) -> str:
+    return "\n".join(f"- {f['headline']} ({f.get('source', '')})"
+                     for f in [f for f in entries if f.get("topic") == key][-limit:])
+
+
+def _feedback_block(key: str, feedback: dict, digest_threshold: int) -> str:
+    """The reader's 👎 / 👍 / ⭐ examples for this topic, as scoring guidance."""
+    out = ""
+    if lines := _examples(feedback.get("not_interested") or [], key):
+        out += (f"\n\nThe reader marked these past stories 👎 (less like this). Score stories of the same kind "
+                f"below {digest_threshold}, unless they meet the instant_alert_if rule:\n{lines}")
+    if lines := _examples(feedback.get("more_like_this") or [], key):
+        out += (f"\n\nThe reader marked these past stories 👍 (more like this). Score stories of the same kind "
+                f"about 1 point higher than you otherwise would:\n{lines}")
+    if lines := _examples(feedback.get("starred") or [], key):
+        out += (f"\n\nThe reader starred ⭐ these past stories (liked them most). Score stories of the same kind "
+                f"about 2 points higher than you otherwise would (never above 10):\n{lines}")
+    return out
 
 
 def score_all(interests: dict, items_by_topic: Dict[str, List[Item]], recent_headlines: List[str],
-              not_interested: List[dict] = ()) -> Tuple[List[Story], List[str]]:
-    """Return (stories, keys of topics that failed to score)."""
-    # Keys not scoped to a workspace must name one; workspace-scoped keys need nothing extra.
-    workspace = os.environ.get("ANTHROPIC_WORKSPACE_ID")
-    client = anthropic.Anthropic(default_headers={"anthropic-workspace-id": workspace} if workspace else None)
+              feedback: Optional[dict] = None) -> Tuple[List[Story], List[str]]:
+    """Return (stories, keys of topics that failed to score). `feedback` is feedback.yaml's content."""
+    client = make_client()
     keys = [k for k, v in items_by_topic.items() if v]
     with ThreadPoolExecutor(max_workers=4) as pool:
         results = dict(zip(keys, pool.map(lambda k: score_topic(client, interests, k, items_by_topic[k],
-                                                                recent_headlines, list(not_interested)), keys)))
+                                                                recent_headlines, feedback or {}), keys)))
     failed = [k for k, r in results.items() if r is None]
     return [s for r in results.values() if r for s in r], failed

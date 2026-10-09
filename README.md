@@ -5,7 +5,7 @@ A personal news briefing webpage, rebuilt at 06:30 (*Win's Morning Briefing*) an
 Page: https://winv-gpt.github.io/NewsAggregator/
 
 Each run:
-1. Fetches everything published since the previous run from the sources in `feeds.yaml`.
+1. Fetches everything published since the previous run from the sources in `feeds.yaml` (articles with no date are skipped). Claude is also told today's date and drops old articles that resurface with a new date, which happens with Google News searches.
 2. Asks Claude (Sonnet 5 by default) to merge duplicate stories, translate Thai items, and score each story 0–10 against your rules in `interests.yaml`.
 3. Rebuilds the page: **Alerts** (score 8+, at most 6 a day) at the top, then each topic's stories (5–7), each with a one-sentence summary (25 words max), then **Markets** at the bottom.
 

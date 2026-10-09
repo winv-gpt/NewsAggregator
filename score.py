@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
+from zoneinfo import ZoneInfo
 
 import anthropic
 import yaml
@@ -19,6 +20,7 @@ EFFORT = os.environ.get("NEWSBOT_EFFORT") or "medium"
 
 SYSTEM = """You are the editor of a personal news briefing for {name} (timezone {tz}).
 You receive the raw items fetched for ONE topic since the last briefing, plus that topic's rules.
+Today is {today}; this briefing covers news since {since}.
 
 For the topic:
 1. Group items that report the same story (across outlets, and across languages) into one story.
@@ -27,6 +29,11 @@ For the topic:
    - {digest}-{alert_minus}: meets the topic's `digest_if` rule.
    - below {digest}: everything else, including anything matching `ignore` rules.
    Respect caps in the rules (e.g. "top 5", "max 3 per day") by scoring the rest below {digest}.
+   Score 0 anything that is not new, even if its `published` date is recent (news search engines
+   often re-date old pages): an old article resurfacing, i.e. one whose news is clearly weeks or
+   months old (such as a January transfer-window story in October); an evergreen page (rules,
+   guides, history, club or competition profiles); or a recap of a past season or event. Fresh
+   coverage of something that happened a day or two ago (e.g. a match report) still counts as new.
 3. Write a neutral English headline and a one-sentence English summary of at most {max_words} words
    for each story, translating any non-English source. The summary should say what happened and,
    if room allows, why it matters. Base it only on the items given; do not add facts.
@@ -94,14 +101,16 @@ def _topic_rules(topic: dict) -> str:
 
 
 def score_topic(client: anthropic.Anthropic, interests: dict, key: str, items: List[Item],
-                recent_headlines: List[str], feedback: dict) -> Optional[List[Story]]:
+                recent_headlines: List[str], feedback: dict, since: datetime) -> Optional[List[Story]]:
     """Return the topic's stories, or None if Claude could not score it."""
     if not items:
         return []
     alert, digest = thresholds(interests)
+    tz = ZoneInfo(interests["owner"]["timezone"])
     system = SYSTEM.format(
         name=interests["owner"]["name"], tz=interests["owner"]["timezone"],
         alert=alert, digest=digest, alert_minus=alert - 1, max_words=max_words(interests),
+        today=f"{datetime.now(tz):%A %d %B %Y}", since=f"{since.astimezone(tz):%A %d %B %Y, %H:%M}",
         ignore="; ".join(interests.get("ignore", [])),
     )
     payload = [{"id": i.id, "source": i.source, "title": i.title, "summary": i.summary,
@@ -178,12 +187,14 @@ def _feedback_block(key: str, feedback: dict, digest_threshold: int) -> str:
 
 
 def score_all(interests: dict, items_by_topic: Dict[str, List[Item]], recent_headlines: List[str],
-              feedback: Optional[dict] = None) -> Tuple[List[Story], List[str]]:
-    """Return (stories, keys of topics that failed to score). `feedback` is feedback.yaml's content."""
+              feedback: Optional[dict], since: datetime) -> Tuple[List[Story], List[str]]:
+    """Return (stories, keys of topics that failed to score). `feedback` is feedback.yaml's content;
+    `since` is the start of the briefing window."""
     client = make_client()
     keys = [k for k, v in items_by_topic.items() if v]
     with ThreadPoolExecutor(max_workers=4) as pool:
         results = dict(zip(keys, pool.map(lambda k: score_topic(client, interests, k, items_by_topic[k],
-                                                                recent_headlines, feedback or {}), keys)))
+                                                                recent_headlines, feedback or {}, since),
+                                                    keys)))
     failed = [k for k, r in results.items() if r is None]
     return [s for r in results.values() if r for s in r], failed

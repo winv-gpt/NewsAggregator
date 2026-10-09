@@ -56,14 +56,17 @@ def fetch_source(name: str, spec: dict, since: datetime) -> List[Item]:
         log.warning("source %r failed: %s", name, e)
         return []
     feed = feedparser.parse(resp.content)
-    items = []
+    items, undated = [], 0
     for entry in feed.entries[:MAX_PER_SOURCE]:
         link = entry.get("link", "")
         title = _clean(entry.get("title", ""))
         if not link or not title:
             continue
         published = _published(entry)
-        if published and published < since:
+        if published is None:   # can't tell whether it's new, so leave it out
+            undated += 1
+            continue
+        if published < since:
             continue
         source = name
         if "google" in spec:
@@ -85,6 +88,8 @@ def fetch_source(name: str, spec: dict, since: datetime) -> List[Item]:
             link=link,
             published=published,
         ))
+    if undated:
+        log.warning("source %r: skipped %d item(s) with no date", name, undated)
     if not feed.entries:
         log.warning("source %r returned no entries", name)
     return items

@@ -213,7 +213,7 @@ def main():
     if args.fake_scores:
         stories, failed = fake_scores(items_by_topic, max_words(interests)), []
     else:
-        stories, failed = score_all(interests, items_by_topic, recent, feedback)
+        stories, failed = score_all(interests, items_by_topic, recent, feedback, since)
     attempted = [t for t, items in items_by_topic.items() if items]
     if attempted and len(failed) == len(attempted):
         raise SystemExit("Claude could not score any topic (see errors above); page and memory left unchanged")

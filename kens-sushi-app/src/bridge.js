@@ -17,7 +17,7 @@ import { Purchases as PurchasesPlugin } from '@revenuecat/purchases-capacitor';
 import { AdMob as AdMobPlugin, RewardAdPluginEvents, InterstitialAdPluginEvents } from '@capacitor-community/admob';
 import { initializeApp } from 'firebase/app';
 import { initializeAuth, indexedDBLocalPersistence, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, collection, doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { getFirestore, collection, doc, onSnapshot, setDoc, Timestamp } from 'firebase/firestore';
 
 const CFG = window.KEN_CONFIG || {};
 // Tests only (test/app-check.cjs): stand-ins for the native plugins. Never set in the app.
@@ -109,13 +109,14 @@ const TEST_UNITS = {
 };
 function makeAds(){
   const am = CFG.admob || {}, units = Object.assign({}, TEST_UNITS[platform] || {}, am.test ? {} : (am[platform] || {}));
-  let started = null;
+  let started = null, privacyRequired = false;
   const start = () => (started = started || (async () => {
     if (!native) throw new Error('ads need the app');
     await AdMob.initialize({ initializeForTesting: !!am.test });
     // Europe and the UK: Google's consent form (UMP). Then, on iOS, Apple's tracking prompt.
     try {
       const info = await AdMob.requestConsentInfo();
+      privacyRequired = info.privacyOptionsRequirementStatus === 'REQUIRED';   // the shop then offers "Ad privacy choices"
       if (info.isConsentFormAvailable && info.status === 'REQUIRED') await AdMob.showConsentForm();
     } catch (e) { log('consent', e); }
     if (platform === 'ios'){
@@ -140,7 +141,10 @@ function makeAds(){
     });
   };
   if (native) setTimeout(() => start().catch(e => log('ads unavailable', e && e.message)), 1500);
-  return { show: kind => play(kind).catch(() => 'failed') };
+  return {
+    show: kind => play(kind).catch(() => 'failed'),
+    privacyChoices: { available: () => privacyRequired, show: async () => { await start(); await AdMob.showPrivacyOptionsForm(); } }
+  };
 }
 
 // ---------- Rankings and leagues (Firebase) ----------
@@ -171,7 +175,8 @@ function makeCloud(){
         return () => { stop = true; if (off) off(); };
       }
     }),
-    doc: path => ({ set: async value => { const id = await uid; return setDoc(doc(fs, path), Object.assign({}, value, { name: chefName(id) })); } })
+    // expireAt: Firestore's TTL policy deletes a record 12 months after its player last played (see README)
+    doc: path => ({ set: async value => { const id = await uid; return setDoc(doc(fs, path), Object.assign({}, value, { name: chefName(id), expireAt: Timestamp.fromMillis(Date.now() + 365 * 864e5) })); } })
   };
   const user = {
     id: () => uid,

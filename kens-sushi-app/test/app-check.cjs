@@ -47,6 +47,7 @@ const day = () => { const d = new Date(); return d.getFullYear() + '-' + String(
     await openShop(p);
     const shown = await p.evaluate(() => ({ restore: getComputedStyle(document.getElementById('restoreBtn')).display !== 'none', invite: !!document.getElementById('shopInvite').offsetParent }));
     ok(shown.restore && !shown.invite, 'shop shows Restore purchases, hides the invite offer', shown);
+    ok(await p.evaluate(() => document.getElementById('adPrivacyWrap').hidden), 'no Ad privacy choices link where it isn’t required');
     const before = await shopSub(p);
     await p.click('[data-sku="wasabi5"]'); await p.waitForTimeout(500);
     ok(/didn’t go through/.test(await toast(p)) && (await shopSub(p)) === before, 'a purchase fails safely (nothing granted)', await toast(p));
@@ -94,7 +95,8 @@ const day = () => { const d = new Date(); return d.getFullYear() + '-' + String(
         },
         AdMob: {
           initialize: async () => L('ads.init'),
-          requestConsentInfo: async () => ({ status: 'REQUIRED', isConsentFormAvailable: true }),
+          requestConsentInfo: async () => ({ status: 'REQUIRED', isConsentFormAvailable: true, privacyOptionsRequirementStatus: 'REQUIRED' }),
+          showPrivacyOptionsForm: async () => L('privacy-options'),
           showConsentForm: async () => { L('consent'); return { status: 'OBTAINED' }; },
           trackingAuthorizationStatus: async () => ({ status: 'notDetermined' }),
           requestTrackingAuthorization: async () => L('tracking'),
@@ -123,6 +125,9 @@ const day = () => { const d = new Date(); return d.getFullYear() + '-' + String(
     ok(shop.w === '¥160' && shop.club === '¥480', 'the store’s own prices show', shop);
     ok(/Renews automatically at ¥480 a month/.test(shop.terms) && /Terms of Use/.test(shop.terms) && /Privacy Policy/.test(shop.terms), 'subscription terms with links are on the Club card', shop.terms);
     ok(shop.termsHref === 'https://example.com/terms', 'Terms of Use link set');
+    ok(!(await p.evaluate(() => document.getElementById('adPrivacyWrap').hidden)), 'Ad privacy choices link shows where consent is required');
+    await p.click('#adPrivacyBtn'); await p.waitForTimeout(400);
+    ok(await p.evaluate(() => window.__kenLog.some(x => x[0] === 'privacy-options')), 'it opens Google’s privacy options form');
     const w0 = await shopSub(p);
     await p.click('.products [data-sku="wasabi5"]'); await p.waitForTimeout(600);
     const w1 = await shopSub(p);

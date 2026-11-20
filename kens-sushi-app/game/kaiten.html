@@ -1245,7 +1245,7 @@ html:not(.app) [data-app]{display:none!important}
       <li><div><b>¥1,500,000</b><span>Best value: 85% more yen per dollar</span></div><button class="btn primary" data-sku="yen1500k">$19.99</button></li>
     </ul>
     <p class="fine" data-proto>Prototype: purchases are simulated and nothing is charged.</p>
-    <p class="fine shop-legal" data-app><button class="linkbtn" id="restoreBtn" type="button">Restore purchases</button> · <a id="termsLink" target="_blank" rel="noopener">Terms of Use</a> · <a id="privacyLink" target="_blank" rel="noopener">Privacy Policy</a></p>
+    <p class="fine shop-legal" data-app><button class="linkbtn" id="restoreBtn" type="button">Restore purchases</button> · <a id="termsLink" target="_blank" rel="noopener">Terms of Use</a> · <a id="privacyLink" target="_blank" rel="noopener">Privacy Policy</a><span id="adPrivacyWrap" hidden> · <button class="linkbtn" id="adPrivacyBtn" type="button">Ad privacy choices</button></span></p>
   </section>
 
   <section class="sheet lgsheet" id="sheetLeague" role="dialog" aria-modal="true" aria-labelledby="lgTitle" hidden>
@@ -4410,6 +4410,7 @@ function renderShop(){
   pl.disabled = !!S.plus; pl.textContent = S.plus ? 'You’re a member' : club() ? 'Keep Ken’s Club · $2.99 a month' : 'Join Ken’s Club';
   $('clubFine').textContent = S.plus ? 'Thank you for being a member.' : club() ? 'Your trial ends in ' + trialDays + ' ' + plural(trialDays, 'day', 'days') + '. Join to keep everything.' : 'Cancel any time.';
   $('clubCard').classList.toggle('member', !!S.plus);
+  if (APP) $('adPrivacyWrap').hidden = !(APP.ads && APP.ads.privacyChoices && APP.ads.privacyChoices.available());   // Europe: change ad consent any time
   if (APP && APP.store){   // the store's own prices, in the player's currency, and the subscription terms the stores require
     document.querySelectorAll('.products [data-sku]').forEach(b => { const pr = APP.store.price(b.dataset.sku); if (pr) b.textContent = pr; });
     const cp = APP.store.price('plus'), sp = APP.store.price('starter'), where = APP.platform === 'android' ? 'Google Play' : 'App Store';
@@ -4518,6 +4519,7 @@ function bind(){
     const L = APP.links || {};
     if (L.terms) $('termsLink').href = L.terms; else $('termsLink').hidden = true;
     if (L.privacy) $('privacyLink').href = L.privacy; else $('privacyLink').hidden = true;
+    $('adPrivacyBtn').addEventListener('click', () => { if (APP.ads && APP.ads.privacyChoices) APP.ads.privacyChoices.show().catch(() => toast('Ad privacy choices can’t open right now. Try again in a moment.')); });
     $('restoreBtn').addEventListener('click', () => {
       if (!APP.store) return;
       toast('Checking your purchases…');

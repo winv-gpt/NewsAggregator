@@ -7,11 +7,12 @@ service cloud.firestore {
     match /ranks/{uid} {
       allow read: if request.auth != null;
       allow create, update: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['days', 'total', 'best', 'bestSvc', 'bestDay', 'lg', 'tier', 'club', 'updated', 'name'])
+        && request.resource.data.keys().hasOnly(['days', 'total', 'best', 'bestSvc', 'bestDay', 'lg', 'tier', 'club', 'updated', 'name', 'expireAt'])
         && request.resource.data.name is string && request.resource.data.name.size() <= 24
         && request.resource.data.total is number && request.resource.data.total >= 0
         && request.resource.data.tier is int && request.resource.data.tier >= 0 && request.resource.data.tier <= 5
-        && request.resource.data.club is bool;
+        && request.resource.data.club is bool
+        && request.resource.data.expireAt is timestamp;
       allow delete: if request.auth != null && request.auth.uid == uid;
     }
   }

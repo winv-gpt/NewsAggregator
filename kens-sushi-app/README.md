@@ -55,6 +55,8 @@ Not tested yet: on real phones, against real store and ad accounts, and with Fir
 5. **Firebase.**
    - Create a project, add a Web app, and turn on Authentication > Anonymous.
    - Create a Firestore database and publish `firestore.rules`.
+   - Turn on deletion of old records: Firestore > TTL policies > collection group `ranks`, timestamp field
+     `expireAt`. This deletes a player's record 12 months after they last played, as the Privacy Policy promises.
    - Paste the web config into `app-config.js`.
 6. **Build and run on your phones.** You need a Mac with Xcode 26 for iOS (or a cloud build service such as
    Codemagic), and Android Studio for Android:

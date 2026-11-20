@@ -6,9 +6,9 @@ window.KEN_CONFIG = {
   links: {
     appStore: '',        // https://apps.apple.com/app/id0000000000 (App Store Connect shows the ID once the app exists)
     playStore: '',       // https://play.google.com/store/apps/details?id=com.example.kenssushi
-    terms: '',           // Terms of Use (Apple requires them for the Ken's Club subscription)
-    privacy: '',         // Privacy Policy
-    support: ''          // Support page or mailto: address
+    terms: 'https://kenssushi.com/terms/',       // Terms of Use (Apple requires them for the Ken's Club subscription)
+    privacy: 'https://kenssushi.com/privacy/',   // Privacy Policy
+    support: 'https://kenssushi.com/support/'    // Support page
   },
 
   // RevenueCat: Project settings > API keys > the public app-specific keys (they start appl_ and goog_).

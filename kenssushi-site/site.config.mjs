@@ -5,10 +5,10 @@ export default {
 
   // Who publishes the app: the legal name of your business (or your own name if you publish as an individual),
   // and a postal address. Both appear in the Privacy Policy and Terms of Use.
-  company: '',
-  address: '',
+  company: 'C Vareekasem',
+  address: '335 Sathorn, Bangkok, 10120, Thailand',
   // Whose laws govern the Terms of Use, e.g. 'Singapore', 'England and Wales', 'the State of Delaware, USA'.
-  governingLaw: '',
+  governingLaw: 'Thailand',
 
   // Set these mailboxes up on kenssushi.com (most domain registrars include email forwarding).
   supportEmail: 'support@kenssushi.com',

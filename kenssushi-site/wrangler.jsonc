@@ -1,0 +1,12 @@
+// Cloudflare Workers settings for kenssushi.com: serve the built site in public/ as static files.
+// In Cloudflare: Root directory = kenssushi-site, Build command = node build.mjs, Deploy command = npx wrangler deploy.
+// "name" must match the Worker's name in the Cloudflare dashboard.
+{
+  "name": "kenssushi",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./public",
+    "not_found_handling": "404-page",
+    "html_handling": "auto-trailing-slash"
+  }
+}

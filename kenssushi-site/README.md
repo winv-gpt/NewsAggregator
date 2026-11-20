@@ -31,16 +31,26 @@ When the app is live, add `appStoreUrl` and `playStoreUrl`. Ken’s Sushi on the
 "Coming soon" to App Store and Google Play buttons. Add `admobPublisherId` to fill in `app-ads.txt`.
 
 ## 2. Put it online
-Any static host works. **Cloudflare Pages** is free and the simplest with a custom domain:
-1. In Cloudflare, go to Workers & Pages › Create › Pages › Connect to Git, and pick this repository.
-2. Set the root directory to `kenssushi-site`, the build command to `node build.mjs`, and the output directory to
-   `public`.
-3. After the first deploy, go to Custom domains › Add `kenssushi.com` (and `www.kenssushi.com`). If the domain's DNS
-   is at Cloudflare, it sets up the records for you. Otherwise, it shows the records to add at your registrar.
+Any static host works. **Cloudflare** is free and also handles the domain's email forwarding. New Cloudflare
+projects are "Workers"; `wrangler.jsonc` tells Cloudflare where the built site is.
+
+1. **Clear the registrar's old records.** In Cloudflare, open kenssushi.com › DNS › Records. Delete the **A**,
+   **AAAA** and **CNAME** records named `kenssushi.com` (or `@`) and `www`; these are usually the registrar's parking
+   page. Leave MX and TXT records alone.
+2. **Create the Worker.** Go to Workers & Pages › Create › Import a repository › **winv-gpt/NewsAggregator**, and
+   name the project **`kenssushi`** (it must match `name` in `wrangler.jsonc`). Then set:
+   - Production branch: `claude/relaxed-edison-cqn24r`
+   - Root directory (under advanced settings): `kenssushi-site`
+   - Build command: `node build.mjs`
+   - Deploy command: `npx wrangler deploy` (the default)
+3. Deploy. You get a test address ending in `.workers.dev`.
+4. **Add the domain.** In the Worker, go to Settings › Domains & Routes › Add › Custom domain, and add
+   `kenssushi.com`, then `www.kenssushi.com`. HTTPS is set up automatically.
 
 Other options:
-- **Netlify:** same settings: base `kenssushi-site`, command `node build.mjs`, publish `public`.
-- **GitHub Pages:** publish the contents of `public/`, then add the domain under Settings › Pages.
+- **Cloudflare Pages:** under Workers & Pages › Create, choose the "Pages" option. Use the same root directory and
+  build command, with build output directory `public`.
+- **Netlify:** base `kenssushi-site`, command `node build.mjs`, publish `public`.
 - **Your registrar's hosting:** upload the contents of `public/` to the web root.
 
 ## 3. Set up the two email addresses
@@ -78,6 +88,7 @@ country before launch, especially the governing law and consumer rights sections
 |---|---|
 | `site.config.mjs` | Your details and links |
 | `build.mjs` | Builds `public/` (no dependencies) |
+| `wrangler.jsonc` | Tells Cloudflare to serve `public/` |
 | `src/index.html` | Grandma’s note, the home page |
 | `src/privacy/`, `src/terms/`, `src/support/`, `src/404.html` | The other pages |
 | `src/site.css` | Styles for the policy and support pages |

@@ -1,0 +1,34 @@
+// Ken's Sushi app settings. Fill these in as the accounts come together; anything left empty simply stays off
+// (rankings stay on the phone, the shop says it can't be reached, test ads are used).
+// These values end up inside the app, so only put public keys here (never a secret or server key).
+window.KEN_CONFIG = {
+  // Links shown in the shop and used in the share text. Both stores need the terms and privacy pages.
+  links: {
+    appStore: '',        // https://apps.apple.com/app/id0000000000 (App Store Connect shows the ID once the app exists)
+    playStore: '',       // https://play.google.com/store/apps/details?id=com.example.kenssushi
+    terms: '',           // Terms of Use (Apple requires them for the Ken's Club subscription)
+    privacy: '',         // Privacy Policy
+    support: ''          // Support page or mailto: address
+  },
+
+  // RevenueCat: Project settings > API keys > the public app-specific keys (they start appl_ and goog_).
+  revenuecat: {
+    iosKey: '',
+    androidKey: '',
+    entitlement: 'club'  // the entitlement attached to kens_club_monthly
+  },
+
+  // AdMob ad unit IDs. While test is true, Google's test ads are shown whatever is filled in below.
+  // The AdMob *app* IDs go in the native files instead: see README, "AdMob app IDs".
+  admob: {
+    test: true,
+    ios: { rewarded: '', interstitial: '' },
+    android: { rewarded: '', interstitial: '' }
+  },
+
+  // Firebase: Project settings > Your apps > Web app > the firebaseConfig object. Turns on shared rankings.
+  firebase: null,
+  // firebase: { apiKey: '', authDomain: '', projectId: '', storageBucket: '', messagingSenderId: '', appId: '' },
+
+  debug: false
+};

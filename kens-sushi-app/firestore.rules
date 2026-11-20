@@ -1,0 +1,18 @@
+rules_version = '2';
+// Ken's Sushi rankings and leagues. Each player signs in anonymously and keeps one document, ranks/{their id},
+// with the scores the game sends. Every player can read all of them (that's how the rankings and leagues are
+// worked out on the phone); only the player can write their own, and only in the shape the game sends.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /ranks/{uid} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['days', 'total', 'best', 'bestSvc', 'bestDay', 'lg', 'tier', 'club', 'updated', 'name'])
+        && request.resource.data.name is string && request.resource.data.name.size() <= 24
+        && request.resource.data.total is number && request.resource.data.total >= 0
+        && request.resource.data.tier is int && request.resource.data.tier >= 0 && request.resource.data.tier <= 5
+        && request.resource.data.club is bool;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}

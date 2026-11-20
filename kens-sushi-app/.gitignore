@@ -1,0 +1,14 @@
+node_modules/
+www/
+# native build output and copies of www/ that `npx cap sync` recreates
+android/app/build/
+android/build/
+android/.gradle/
+android/app/src/main/assets/public/
+android/local.properties
+ios/App/App/public/
+ios/App/build/
+ios/DerivedData/
+*.xcuserstate
+xcuserdata/
+.DS_Store

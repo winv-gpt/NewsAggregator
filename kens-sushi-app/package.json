@@ -1,0 +1,32 @@
+{
+  "name": "kens-sushi-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ken's Sushi for the App Store and Google Play: the web game wrapped with Capacitor.",
+  "scripts": {
+    "build": "node scripts/build-web.mjs",
+    "sync": "npm run build && npx cap sync",
+    "ios": "npm run sync && npx cap open ios",
+    "android": "npm run sync && npx cap open android",
+    "assets": "npx @capacitor/assets generate --iconBackgroundColor '#22365E' --iconBackgroundColorDark '#22365E' --splashBackgroundColor '#F1ECE2' --splashBackgroundColorDark '#0F1522'"
+  },
+  "dependencies": {
+    "@capacitor-community/admob": "^8.4.2",
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/cli": "^8.6.2",
+    "@capacitor/core": "^8.6.2",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/ios": "^8.6.2",
+    "@capacitor/local-notifications": "^8.3.1",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/share": "^8.0.3",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@revenuecat/purchases-capacitor": "^14.1.2",
+    "firebase": "^13.4.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^4.0.0",
+    "esbuild": "^0.28.2"
+  }
+}

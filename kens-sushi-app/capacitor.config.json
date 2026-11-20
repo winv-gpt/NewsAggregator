@@ -1,0 +1,12 @@
+{
+  "appId": "com.yourcompany.kenssushi",
+  "appName": "Ken's Sushi",
+  "webDir": "www",
+  "backgroundColor": "#F1ECE2",
+  "ios": { "contentInset": "never" },
+  "android": { "backgroundColor": "#F1ECE2" },
+  "plugins": {
+    "SplashScreen": { "launchShowDuration": 700, "launchAutoHide": true, "backgroundColor": "#F1ECE2", "showSpinner": false },
+    "LocalNotifications": { "iconColor": "#C8402E" }
+  }
+}

@@ -28,9 +28,9 @@ The web game wrapped with [Capacitor](https://capacitorjs.com), the same code fo
 Not tested yet: on real phones, against real store and ad accounts, and with Firebase. Those need the accounts below.
 
 ## What you need to do
-1. **Choose the app ID.** It's `com.yourcompany.kenssushi` in `capacitor.config.json` and can never change after
-   the first upload. Change it there, then rebuild the native projects:
-   delete `android/` and `ios/`, then run `npx cap add android && npx cap add ios && node scripts/native-config.mjs && npm run assets`.
+1. **App ID: `com.kenssushi.app`** (in `capacitor.config.json`; it can never change after the first upload). To
+   rebuild the native projects from scratch: delete `android/` and `ios/`, then run
+   `npx cap add android && npx cap add ios && node scripts/native-config.mjs && npm run assets`.
 2. **Fill in `app-config.js`** as each account is ready:
    - links: store links, Terms of Use, Privacy Policy
    - RevenueCat public keys

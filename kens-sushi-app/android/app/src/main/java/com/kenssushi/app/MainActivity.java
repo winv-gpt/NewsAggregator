@@ -1,4 +1,4 @@
-package com.yourcompany.kenssushi;
+package com.kenssushi.app;
 
 import com.getcapacitor.BridgeActivity;
 

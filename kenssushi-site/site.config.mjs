@@ -23,5 +23,5 @@ export default {
   playStoreUrl: '',
 
   // AdMob publisher ID (pub-…, from AdMob > Settings). Fills in app-ads.txt, which AdMob checks on this domain.
-  admobPublisherId: ''
+  admobPublisherId: 'pub-7799816604410900'
 };

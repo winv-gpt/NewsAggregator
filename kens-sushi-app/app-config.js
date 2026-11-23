@@ -18,12 +18,14 @@ window.KEN_CONFIG = {
     entitlement: 'club'  // the entitlement attached to kens_club_monthly
   },
 
-  // AdMob ad unit IDs. While test is true, Google's test ads are shown whatever is filled in below.
+  // AdMob ad unit IDs. While test is true, Google's test ads are shown whatever is filled in below:
+  // keep it true while developing (tapping your own real ads can get an AdMob account suspended),
+  // and set it to false for the build you send to the stores.
   // The AdMob *app* IDs go in the native files instead: see README, "AdMob app IDs".
   admob: {
     test: true,
-    ios: { rewarded: '', interstitial: '' },
-    android: { rewarded: '', interstitial: '' }
+    ios: { rewarded: 'ca-app-pub-7799816604410900/4346126348', interstitial: 'ca-app-pub-7799816604410900/8345081107' },
+    android: { rewarded: 'ca-app-pub-7799816604410900/5910489458', interstitial: 'ca-app-pub-7799816604410900/4537698038' }
   },
 
   // Firebase: Project settings > Your apps > Web app > the firebaseConfig object. Turns on shared rankings.

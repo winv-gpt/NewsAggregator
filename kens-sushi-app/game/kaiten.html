@@ -3884,7 +3884,7 @@ async function renderLeague(){
   if (gen !== rankGen) return;
   ol.innerHTML = g ? leagueRowsHtml(g, idx, ps, me) : '<li class="empty">Finish a service this week to join the ' + leagueName(tier) + '. You’ll be grouped with up to 30 players.</li>';
   const r = S.lgResult;
-  $('rankNote').textContent = rankNote || (r && r.pos >= 0 ? 'Last week: #' + (r.pos + 1) + ' of ' + r.n + ' in the ' + leagueName(r.from) + (r.to > r.from ? ', moved up.' : r.to < r.from ? ', dropped down.' : ', stayed.') : !DB ? 'On the published page, everyone who plays this week is grouped into leagues by their takings.' : '');
+  $('rankNote').textContent = rankNote || (r && r.pos >= 0 ? 'Last week: #' + (r.pos + 1) + ' of ' + r.n + ' in the ' + leagueName(r.from) + (r.to > r.from ? ', moved up.' : r.to < r.from ? ', dropped down.' : ', stayed.') : !DB ? (APP ? 'Connect to the internet to join this week’s league.' : 'On the published page, everyone who plays this week is grouped into leagues by their takings.') : '');
 }
 
 // ---------- Fish book ----------

@@ -31,6 +31,7 @@ const day = () => { const d = new Date(); return d.getFullYear() + '-' + String(
     const c = await b.newContext({ viewport: { width: 390, height: 844 } }), p = await c.newPage(), errs = [], external = [];
     p.on('pageerror', e => errs.push(e.message));
     p.on('request', q => { if (!q.url().startsWith(base)) external.push(q.url()); });
+    await p.route('**/app-config.js', r => r.fulfill({ contentType: 'text/javascript', body: 'window.KEN_CONFIG = {links: {}, revenuecat: {}, admob: {test: true}, firebase: null};' }));   // nothing configured
     await p.goto(base); await p.waitForTimeout(2500);
     const ui = await p.evaluate(() => ({
       app: document.documentElement.classList.contains('app'),
@@ -168,6 +169,20 @@ const day = () => { const d = new Date(); return d.getFullYear() + '-' + String(
     const sh = await p.evaluate(() => window.__kenLog.filter(x => x[0] === 'write' || x[0] === 'share'));
     ok(sh.length === 2 && sh[1][1][0] === 'file:///cache/kens-sushi.png', 'share picture is saved and handed to the share sheet', sh);
     ok(errs.length === 0, 'no page errors', errs);
+    await c.close();
+  }
+  // ---------- C. (LIVE_FIREBASE=1 only) the real Firebase project from app-config.js ----------
+  // Signs in anonymously (one test player, no scores written) and reads the rankings.
+  if (process.env.LIVE_FIREBASE){
+    console.log('C. live Firebase');
+    const c = await b.newContext({ viewport: { width: 390, height: 844 } }), p = await c.newPage(), auth = [];
+    p.on('response', r => { if (/identitytoolkit|securetoken/.test(r.url())) auth.push(r.url().split('?')[0].split('/').pop() + ' ' + r.status()); });
+    await p.goto(base);
+    let note = '';
+    for (let i = 0; i < 25; i++){ await p.waitForTimeout(1000); note = await p.evaluate(() => (document.getElementById('rankNote') || {}).textContent || ''); if (auth.length && !/Connect to the internet|can't be reached yet/.test(note)) break; }   // wait for the connection to settle
+    const signedIn = auth.some(a => /signUp 200/.test(a));
+    ok(signedIn, 'anonymous sign-in works (Authentication › Anonymous is on)', auth);
+    ok(signedIn && !/unavailable|can't be reached|Sign in|Connect to the internet/.test(note), 'the rankings can be read (Firestore exists and the rules allow it)', note || '(no note: connected, league empty)');
     await c.close();
   }
   await b.close(); srv.close();

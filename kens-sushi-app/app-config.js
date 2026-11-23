@@ -29,8 +29,15 @@ window.KEN_CONFIG = {
   },
 
   // Firebase: Project settings > Your apps > Web app > the firebaseConfig object. Turns on shared rankings.
-  firebase: null,
-  // firebase: { apiKey: '', authDomain: '', projectId: '', storageBucket: '', messagingSenderId: '', appId: '' },
+  // No measurementId on purpose: the app doesn't use Google Analytics (the Privacy Policy says so).
+  firebase: {
+    apiKey: 'AIzaSyBUg8RP1pKID-qUaBtJGrb0vDvT11_77jo',
+    authDomain: 'ken-s-sushi.firebaseapp.com',
+    projectId: 'ken-s-sushi',
+    storageBucket: 'ken-s-sushi.firebasestorage.app',
+    messagingSenderId: '795868275854',
+    appId: '1:795868275854:web:3d42b23d0ee59e848dd5df'
+  },
 
   debug: false
 };

@@ -36,9 +36,7 @@ Not tested yet: on real phones, against real store and ad accounts, and with Fir
    - RevenueCat public keys
    - AdMob ad unit IDs, and set `test: false` for release
    - the Firebase web config
-3. **AdMob app IDs.** These go in the native files rather than `app-config.js`. Run
-   `ADMOB_IOS_APP_ID=ca-app-pub-…~… ADMOB_ANDROID_APP_ID=ca-app-pub-…~… node scripts/native-config.mjs`.
-   For iOS, also add Google's full SKAdNetwork list (from Google's AdMob iOS guide) if you use mediation.
+3. **AdMob app IDs**: done (`scripts/native-config.mjs` puts them in the native projects).
 4. **Store products.** Create these in App Store Connect and Play Console, add them to RevenueCat, and attach the
    `club` entitlement to the subscription:
 

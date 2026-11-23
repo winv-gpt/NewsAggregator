@@ -63,7 +63,7 @@
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 	<key>GADApplicationIdentifier</key>
-	<string>ca-app-pub-3940256099942544~1458002511</string>
+	<string>ca-app-pub-7799816604410900~1611443954</string>
 	<key>NSUserTrackingUsageDescription</key>
 	<string>Ken’s Sushi uses this to show ads that suit you better. The game plays the same either way.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>

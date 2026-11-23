@@ -1,7 +1,7 @@
 // Store-ready settings for the generated android/ and ios/ projects. Safe to run again: each change is applied once.
 // Run it after `npx cap add android` / `npx cap add ios` (for example after changing the app ID).
 //   - portrait only, iPhone only (it still runs on iPads, so no iPad screenshots are needed)
-//   - AdMob app IDs (Google's test IDs until you put in your own: edit ADMOB below)
+//   - AdMob app IDs (edit ADMOB below)
 //   - Apple's tracking prompt text, the ad networks list Apple asks for, and the export-compliance answer
 //   - no exact-alarm permission on Android (Google Play only allows it for alarm and calendar apps)
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -9,9 +9,11 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+// Ken's Sushi's AdMob app IDs (AdMob › Apps › App ID). Google's test app IDs, for reference:
+// Android ca-app-pub-3940256099942544~3347511713, iOS ca-app-pub-3940256099942544~1458002511.
 const ADMOB = {
-  android: process.env.ADMOB_ANDROID_APP_ID || 'ca-app-pub-3940256099942544~3347511713',   // Google's test app ID
-  ios: process.env.ADMOB_IOS_APP_ID || 'ca-app-pub-3940256099942544~1458002511'            // Google's test app ID
+  android: process.env.ADMOB_ANDROID_APP_ID || 'ca-app-pub-7799816604410900~7854126510',
+  ios: process.env.ADMOB_IOS_APP_ID || 'ca-app-pub-7799816604410900~1611443954'
 };
 const TRACKING_TEXT = 'Ken’s Sushi uses this to show ads that suit you better. The game plays the same either way.';
 const edit = (rel, fn) => { const p = join(ROOT, rel); if (!existsSync(p)) { console.log('skip (not found):', rel); return; } const a = readFileSync(p, 'utf8'), b = fn(a); if (a !== b) { writeFileSync(p, b); console.log('updated', rel); } else console.log('ok     ', rel); };

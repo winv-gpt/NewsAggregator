@@ -15,7 +15,7 @@ window.KEN_CONFIG = {
   revenuecat: {
     iosKey: '',
     androidKey: '',
-    entitlement: 'club'  // the entitlement attached to kens_club_monthly
+    entitlement: 'ken_s_sushi_pro'  // RevenueCat entitlement for Ken's Club; attach kens_club_monthly to it
   },
 
   // AdMob ad unit IDs. While test is true, Google's test ads are shown whatever is filled in below:

@@ -38,7 +38,7 @@ Not tested yet: on real phones, against real store and ad accounts, and with Fir
    - the Firebase web config
 3. **AdMob app IDs**: done (`scripts/native-config.mjs` puts them in the native projects).
 4. **Store products.** Create these in App Store Connect and Play Console, add them to RevenueCat, and attach the
-   `club` entitlement to the subscription:
+   `ken_s_sushi_pro` entitlement to the subscription:
 
    | ID | What | Type | Price |
    |---|---|---|---|

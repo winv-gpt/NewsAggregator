@@ -31,7 +31,8 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      # The bot's memory (what was already shown, plus past briefings) lives in state/, carried between runs.
+      # The bot's memory (what was already shown, today's market data) lives in state/, carried between
+      # runs in the Actions cache. The deploy job saves it after publishing.
       - name: Restore state
         uses: actions/cache/restore@v4
         with:
@@ -46,12 +47,14 @@ jobs:
           NEWSBOT_MODEL: ${{ vars.NEWSBOT_MODEL }}
         run: python run.py
 
-      - name: Save state
-        if: always()
-        uses: actions/cache/save@v4
+      # Handed to the deploy job, which saves it only once the page is published, so stories from a
+      # briefing that never reached the page aren't remembered as shown.
+      - name: Hand over state
+        uses: actions/upload-artifact@v4
         with:
+          name: bot-state
           path: state
-          key: newsbot-state-${{ github.run_id }}
+          retention-days: 1
 
       - uses: actions/upload-pages-artifact@v3
         with:
@@ -71,3 +74,15 @@ jobs:
     steps:
       - id: deploy
         uses: actions/deploy-pages@v4
+
+      - name: Fetch state
+        uses: actions/download-artifact@v4
+        with:
+          name: bot-state
+          path: state
+
+      - name: Save state
+        uses: actions/cache/save@v4
+        with:
+          path: state
+          key: newsbot-state-${{ github.run_id }}

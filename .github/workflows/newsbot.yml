@@ -21,9 +21,6 @@ jobs:
   briefing:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -60,5 +57,17 @@ jobs:
         with:
           path: site
 
+  # Publishing is a separate job: when deploy-pages ran straight after the upload in the same job,
+  # it sometimes couldn't find the just-uploaded page yet ("No artifacts named github-pages were
+  # found", actions/deploy-pages#451). If publishing fails, "Re-run failed jobs" publishes the
+  # briefing that was already built, without rebuilding it.
+  deploy:
+    needs: briefing
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
       - id: deploy
         uses: actions/deploy-pages@v4

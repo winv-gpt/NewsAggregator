@@ -13,7 +13,7 @@ window.KEN_CONFIG = {
 
   // RevenueCat: Project settings > API keys > the public app-specific keys (they start appl_ and goog_).
   revenuecat: {
-    iosKey: '',
+    iosKey: 'appl_zghfsotmWVIqrMqBIpQkiDECXUS',
     androidKey: '',
     entitlement: 'ken_s_sushi_pro'  // RevenueCat entitlement for Ken's Club; attach kens_club_monthly to it
   },
